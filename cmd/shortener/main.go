@@ -40,7 +40,7 @@ func postUrl(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// #4.1 проверка URL как text/plain
-	if req.Header.Get("Content-Type") != "text/plain" {
+	if req.Header.Get("Content-Type") != "text/plain\n" {
 		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
 		return
 	}
