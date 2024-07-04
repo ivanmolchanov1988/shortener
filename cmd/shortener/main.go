@@ -40,7 +40,7 @@ func postUrl(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// #4.1 проверка URL как text/plain
-	if req.Header.Get("Content-Type") != "text/plain\n" {
+	if req.Header.Get("Content-Type") != "text/plain" {
 		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
 		return
 	}
@@ -87,9 +87,9 @@ func getUrl(res http.ResponseWriter, req *http.Request) {
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")
 	if idLink == "" {
-		//http.Error(res, "This ID does not exist", http.StatusBadRequest)
-		res.Header().Set("Content-Type", "text/plain")
-		res.Write([]byte("Shortener"))
+		http.Error(res, "This ID does not exist", http.StatusBadRequest)
+		// res.Header().Set("Content-Type", "text/plain")
+		// res.Write([]byte("Shortener"))
 		return
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
@@ -112,7 +112,7 @@ func main() {
 		} else if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/") {
 			getUrl(res, req)
 		} else {
-			http.Error(res, "Not Found", http.StatusNotFound)
+			http.Error(res, "Not Found", http.StatusBadRequest)
 		}
 	})
 
