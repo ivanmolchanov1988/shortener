@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -71,7 +72,8 @@ func postUrl(res http.ResponseWriter, req *http.Request) {
 	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
 	// #5 возвращает ответ с сокращённым URL
-	res.Write([]byte(shortUrl))
+	fullShortUrl := fmt.Sprintf("http://%s/%s", req.Host, shortUrl)
+	res.Write([]byte(fullShortUrl))
 
 	// res.Write([]byte("Тут будет POST '/' URL = text/plain и ответ = 201 + сокращённый URL как text/plain"))
 }
