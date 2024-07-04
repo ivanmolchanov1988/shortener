@@ -78,7 +78,7 @@ func postUrl(res http.ResponseWriter, req *http.Request) {
 	// res.Write([]byte("Тут будет POST '/' URL = text/plain и ответ = 201 + сокращённый URL как text/plain"))
 }
 
-// //////// GET //////////
+// ///////// GET //////////
 func getUrl(res http.ResponseWriter, req *http.Request) {
 	// #6 проверка на GET
 	if req.Method != http.MethodGet {
