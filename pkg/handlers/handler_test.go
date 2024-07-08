@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ivanmolchanov1988/shortener/config"
 	"github.com/ivanmolchanov1988/shortener/pkg/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,8 +69,9 @@ func TestPostUrl(t *testing.T) {
 		},
 	}
 
+	cfg := config.InitConfig()
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore)
+	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
@@ -98,8 +100,9 @@ func TestGetUrl(t *testing.T) {
 	testShortURL := "testURL"
 	invalidShortUrl := "123321"
 
+	cfg := config.InitConfig()
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore)
+	handler := NewHandler(memStore, cfg)
 
 	err := memStore.SaveURL(testShortURL, "https://testURL123.ru")
 	require.NoError(t, err)
