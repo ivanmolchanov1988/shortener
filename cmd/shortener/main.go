@@ -14,6 +14,12 @@ import (
 )
 
 func main() {
+	// Проверка параметров
+	// if len(os.Args) < 2 {
+	// 	config.Usage()
+	// 	os.Exit(1)
+	// }
+
 	// Конфигурация флагов
 	cfg := config.InitConfig()
 
@@ -30,7 +36,8 @@ func main() {
 	r.Post("/", handler.PostUrl)
 	r.Get("/{id}", handler.GetUrl)
 
-	if err := http.ListenAndServe(cfg.Address, nil); err != nil {
-		fmt.Printf("start with error: %v\n", err)
+	fmt.Printf("Server start: => %s\n\r", cfg.Address)
+	if err := http.ListenAndServe(cfg.Address, r); err != nil {
+		fmt.Printf("Start with error: %v\n", err)
 	}
 }

@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"fmt"
+	"os"
 )
 
 type Config struct {
@@ -9,12 +11,32 @@ type Config struct {
 	B_URL   string
 }
 
-func InitConfig() *Config {
-	config := &Config{}
+func Usage() {
+	// Версия
+	var version = "0.0.1"
 
-	flag.StringVar(&config.Address, "a", "localhost:8080", "address to start the HTTP server")
-	flag.StringVar(&config.B_URL, "b", "http://localhost:8080", "the URL for the shortURL")
+	fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
+	fmt.Fprintf(flag.CommandLine.Output(), "Version: %s\n\n ", version)
+	flag.PrintDefaults()
+}
+
+func InitConfig() *Config {
+
+	// Моя Usage
+	flag.Usage = Usage
+
+	address := flag.String("a", "localhost:8080", "address to start the HTTP server")
+	bURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	flag.Parse()
 
-	return config
+	if *address == "" || *bURL == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return &Config{
+		Address: *address,
+		B_URL:   *bURL,
+	}
+
 }

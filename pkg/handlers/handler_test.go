@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// для теста конфига
+var cfg = &config.Config{
+	Address: "localhost:8080",
+	B_URL:   "http://localhost:8080",
+}
+
+func init() {
+	flag.CommandLine = flag.NewFlagSet("", flag.ExitOnError)
+}
 
 func TestPostUrl(t *testing.T) {
 
@@ -69,7 +80,6 @@ func TestPostUrl(t *testing.T) {
 		},
 	}
 
-	cfg := config.InitConfig()
 	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
@@ -100,7 +110,6 @@ func TestGetUrl(t *testing.T) {
 	testShortURL := "testURL"
 	invalidShortUrl := "123321"
 
-	cfg := config.InitConfig()
 	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
 
