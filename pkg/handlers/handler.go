@@ -26,11 +26,11 @@ func NewHandler(s storage.Storage, cfg *config.Config) *Handler {
 
 // //////// POST //////////
 func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
-	// #1 проверка на POST
-	if req.Method != http.MethodPost {
-		http.Error(res, "Only the POST method is available", http.StatusBadRequest)
-		return
-	}
+	// #1 проверка на POST - уже есть в main.go
+	// if req.Method != http.MethodPost {
+	// 	http.Error(res, "Only the POST method is available", http.StatusBadRequest)
+	// 	return
+	// }
 	// #4.1 проверка URL как text/plain
 	contentType := req.Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "text/plain") {
@@ -73,11 +73,11 @@ func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
 
 // ///////// GET //////////
 func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
-	// #6 проверка на GET
-	if req.Method != http.MethodGet {
-		http.Error(res, "Only the GET method is available", http.StatusBadRequest)
-		return
-	}
+	// #6 проверка на GET - уже есть в main.go
+	// if req.Method != http.MethodGet {
+	// 	http.Error(res, "Only the GET method is available", http.StatusBadRequest)
+	// 	return
+	// }
 
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")

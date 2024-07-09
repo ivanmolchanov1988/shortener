@@ -14,23 +14,11 @@ import (
 )
 
 func main() {
-	// Проверка параметров
-	// if len(os.Args) < 2 {
-	// 	config.Usage()
-	// 	os.Exit(1)
-	// }
-
 	// Конфигурация флагов
 	cfg := config.InitConfig()
 
 	memStore := memory.NewMemoryStorage()
 	handler := handlers.NewHandler(memStore, cfg)
-	//srv := server.NewServer(handler)
-
-	// err := srv.ListenAndServe()
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	r := chi.NewRouter()
 	r.Post("/", handler.PostUrl)
