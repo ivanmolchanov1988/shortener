@@ -1,16 +1,28 @@
 package handlers
 
 import (
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/ivanmolchanov1988/shortener/config"
 	"github.com/ivanmolchanov1988/shortener/pkg/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// для теста конфига
+var cfg = &config.Config{
+	Address: "localhost:8080",
+	B_URL:   "http://localhost:8080",
+}
+
+func init() {
+	flag.CommandLine = flag.NewFlagSet("", flag.ExitOnError)
+}
 
 func TestPostUrl(t *testing.T) {
 
@@ -69,7 +81,7 @@ func TestPostUrl(t *testing.T) {
 	}
 
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore)
+	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
@@ -99,7 +111,7 @@ func TestGetUrl(t *testing.T) {
 	invalidShortUrl := "123321"
 
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore)
+	handler := NewHandler(memStore, cfg)
 
 	err := memStore.SaveURL(testShortURL, "https://testURL123.ru")
 	require.NoError(t, err)

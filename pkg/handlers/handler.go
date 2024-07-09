@@ -7,16 +7,21 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/config"
 	"github.com/ivanmolchanov1988/shortener/pkg/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
 type Handler struct {
 	storage storage.Storage
+	config  *config.Config
 }
 
-func NewHandler(s storage.Storage) *Handler {
-	return &Handler{storage: s}
+func NewHandler(s storage.Storage, cfg *config.Config) *Handler {
+	return &Handler{
+		storage: s,
+		config:  cfg,
+	}
 }
 
 // //////// POST //////////
@@ -59,7 +64,8 @@ func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
 	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
 	// #5 возвращает ответ с сокращённым URL
-	fullShortUrl := fmt.Sprintf("http://%s/%s", req.Host, shortUrl)
+	//fullShortUrl := fmt.Sprintf("http://%s/%s", req.Host, shortUrl)
+	fullShortUrl := fmt.Sprintf("%s/%s", h.config.B_URL, shortUrl)
 	res.Write([]byte(fullShortUrl))
 
 	// res.Write([]byte("Тут будет POST '/' URL = text/plain и ответ = 201 + сокращённый URL как text/plain"))
