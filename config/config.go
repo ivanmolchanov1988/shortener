@@ -28,14 +28,12 @@ func getAddressAndBaseURL() (string, string) {
 
 	if address == "" {
 		tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
-		flag.Parse()
 		address = *tempAddress
 	} else {
 		fmt.Printf("Using ENV for address: %s\n", address)
 	}
 	if baseURL == "" {
 		tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
-		flag.Parse()
 		baseURL = *tempBaseURL
 	} else {
 		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
@@ -49,6 +47,8 @@ func InitConfig() *Config {
 	flag.Usage = Usage
 
 	address, baseURL := getAddressAndBaseURL()
+	flag.Parse()
+
 	if address == "" || baseURL == "" {
 		flag.Usage()
 		os.Exit(1)
