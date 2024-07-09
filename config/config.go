@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+// Добавил export SERVER_ADDRESS=localhost:8080
+// Добавил export BASE_URL=http://localhost:8080
 type Config struct {
 	Address string
 	B_URL   string
@@ -20,23 +22,41 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
+func getAddressAndBaseURL() (string, string) {
+	address := os.Getenv("SERVER_ADDRESS")
+	baseURL := os.Getenv("BASE_URL")
+
+	if address == "" {
+		tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
+		flag.Parse()
+		address = *tempAddress
+	} else {
+		fmt.Printf("Using ENV for address: %s\n", address)
+	}
+	if baseURL == "" {
+		tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+		flag.Parse()
+		baseURL = *tempBaseURL
+	} else {
+		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
+	}
+	return address, baseURL
+}
+
 func InitConfig() *Config {
 
 	// Моя Usage
 	flag.Usage = Usage
 
-	address := flag.String("a", "localhost:8080", "address to start the HTTP server")
-	bURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
-	flag.Parse()
-
-	if *address == "" || *bURL == "" {
+	address, baseURL := getAddressAndBaseURL()
+	if address == "" || baseURL == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	return &Config{
-		Address: *address,
-		B_URL:   *bURL,
+		Address: address,
+		B_URL:   baseURL,
 	}
 
 }
