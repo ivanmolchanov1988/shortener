@@ -19,8 +19,8 @@ func main() {
 	handler := handlers.NewHandler(memStore, cfg)
 
 	r := chi.NewRouter()
-	r.Post("/", handler.PostUrl)
-	r.Get("/{id}", handler.GetUrl)
+	r.Post("/", handler.PostURL)
+	r.Get("/{id}", handler.GetURL)
 
 	fmt.Printf("Server start: => %s\n\r", cfg.Address)
 	if err := http.ListenAndServe(cfg.Address, r); err != nil {

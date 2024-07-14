@@ -88,7 +88,7 @@ func TestPostUrl(t *testing.T) {
 			req.Header.Set("Content-Type", tt.contentType)
 			w := httptest.NewRecorder()
 
-			handler.PostUrl(w, req)
+			handler.PostURL(w, req)
 
 			resp := w.Result()
 			defer resp.Body.Close()
@@ -108,7 +108,7 @@ func TestGetUrl(t *testing.T) {
 
 	//запись для тестов
 	testShortURL := "testURL"
-	invalidShortUrl := "123321"
+	invalidShortURL := "123321"
 
 	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
@@ -118,49 +118,49 @@ func TestGetUrl(t *testing.T) {
 
 	tests := []struct { // мне надо передать: URL. Жду: код, original
 		name     string
-		shortUrl string
+		shortURL string
 		want     struct {
 			code        int
-			originalUrl string
+			originalURL string
 		}
 	}{
 		{
 			name:     "valid shortURL",
-			shortUrl: "/" + testShortURL,
+			shortURL: "/" + testShortURL,
 			want: struct {
 				code        int
-				originalUrl string
+				originalURL string
 			}{
 				code:        http.StatusTemporaryRedirect,
-				originalUrl: "https://testURL123.ru",
+				originalURL: "https://testURL123.ru",
 			},
 		},
 		{
 			name:     "invalid shortURL",
-			shortUrl: "/" + invalidShortUrl,
+			shortURL: "/" + invalidShortURL,
 			want: struct {
 				code        int
-				originalUrl string
+				originalURL string
 			}{
 				code:        http.StatusBadRequest,
-				originalUrl: "",
+				originalURL: "",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+tt.shortUrl, nil)
+			req := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+tt.shortURL, nil)
 			w := httptest.NewRecorder()
 
-			handler.GetUrl(w, req)
+			handler.GetURL(w, req)
 
 			res := w.Result()
 			defer res.Body.Close()
 
 			assert.Equal(t, tt.want.code, res.StatusCode)
-			if tt.want.originalUrl != "" {
-				assert.Equal(t, tt.want.originalUrl, res.Header.Get("Location"))
+			if tt.want.originalURL != "" {
+				assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
 			}
 		})
 	}

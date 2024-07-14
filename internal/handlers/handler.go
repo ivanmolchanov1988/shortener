@@ -32,7 +32,7 @@ func NewHandler(s Storage, cfg *server.Config) *Handler {
 }
 
 // //////// POST //////////
-func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	contentType := req.Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
@@ -65,13 +65,13 @@ func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
 	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
 	// #5 возвращает ответ с сокращённым URL
-	fullShortUrl := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
-	res.Write([]byte(fullShortUrl))
+	fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
+	res.Write([]byte(fullShortURL))
 
 }
 
 // ///////// GET //////////
-func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")
 	if idLink == "" {
@@ -79,11 +79,11 @@ func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
-	originUrl, err := h.storage.GetURL(idLink)
+	originURL, err := h.storage.GetURL(idLink)
 	if err != nil {
 		http.Error(res, "URL not found", http.StatusBadRequest)
 		return
 	}
-	res.Header().Set("Location", originUrl)
+	res.Header().Set("Location", originURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }

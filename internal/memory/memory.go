@@ -14,7 +14,7 @@ func NewMemoryStorage() *MemoryStorage {
 
 func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
 	if _, exists := m.data[shortURL]; exists {
-		return errors.New("The URL already exists")
+		return errors.New("the URL already exists")
 	}
 	m.data[shortURL] = originalURL
 	return nil
@@ -23,7 +23,7 @@ func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
 func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		return "", errors.New("The URL not found")
+		return "", errors.New("the URL not found")
 	}
 	return originalURL, nil
 }
