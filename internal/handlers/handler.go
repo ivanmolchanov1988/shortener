@@ -7,17 +7,24 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ivanmolchanov1988/shortener/config"
-	"github.com/ivanmolchanov1988/shortener/pkg/storage"
+	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
-type Handler struct {
-	storage storage.Storage
-	config  *config.Config
+// interfases
+type Storage interface {
+	SaveURL(shortURL, originalURL string) error
+	GetURL(shortURL string) (string, error)
 }
 
-func NewHandler(s storage.Storage, cfg *config.Config) *Handler {
+//
+
+type Handler struct {
+	storage Storage
+	config  *server.Config
+}
+
+func NewHandler(s Storage, cfg *server.Config) *Handler {
 	return &Handler{
 		storage: s,
 		config:  cfg,
@@ -26,12 +33,6 @@ func NewHandler(s storage.Storage, cfg *config.Config) *Handler {
 
 // //////// POST //////////
 func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
-	// #1 проверка на POST - уже есть в main.go
-	// if req.Method != http.MethodPost {
-	// 	http.Error(res, "Only the POST method is available", http.StatusBadRequest)
-	// 	return
-	// }
-	// #4.1 проверка URL как text/plain
 	contentType := req.Header.Get("Content-Type")
 	if !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
@@ -51,44 +52,33 @@ func (h *Handler) PostUrl(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Забираем рандомную строку для ссылки
-	shortUrl, err := utils.RandStr(8)
+	shortURL, err := utils.RandStr(8)
 	if err != nil {
 		http.Error(res, "Unable to generate short URL", http.StatusBadRequest)
 		return
 	}
 	// Сохраним URL
-	h.storage.SaveURL(shortUrl, urlStr)
+	h.storage.SaveURL(shortURL, urlStr)
 
 	// #2 Header Content-Type = text/plain
 	res.Header().Set("Content-Type", "text/plain")
 	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
 	// #5 возвращает ответ с сокращённым URL
-	//fullShortUrl := fmt.Sprintf("http://%s/%s", req.Host, shortUrl)
-	fullShortUrl := fmt.Sprintf("%s/%s", h.config.B_URL, shortUrl)
+	fullShortUrl := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
 	res.Write([]byte(fullShortUrl))
 
-	// res.Write([]byte("Тут будет POST '/' URL = text/plain и ответ = 201 + сокращённый URL как text/plain"))
 }
 
 // ///////// GET //////////
 func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
-	// #6 проверка на GET - уже есть в main.go
-	// if req.Method != http.MethodGet {
-	// 	http.Error(res, "Only the GET method is available", http.StatusBadRequest)
-	// 	return
-	// }
-
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")
 	if idLink == "" {
 		http.Error(res, "This ID does not exist", http.StatusBadRequest)
-		// res.Header().Set("Content-Type", "text/plain")
-		// res.Write([]byte("Shortener"))
 		return
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
-	//originUrl, ok := memory.TempUrlStore[idLink]
 	originUrl, err := h.storage.GetURL(idLink)
 	if err != nil {
 		http.Error(res, "URL not found", http.StatusBadRequest)
@@ -96,6 +86,4 @@ func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Location", originUrl)
 	res.WriteHeader(http.StatusTemporaryRedirect)
-
-	// res.Write([]byte("Тут будет GET '/{id}/' id = идентификатор сокращённого URL и ответ = 307 + оригинальным URL в HTTP-заголовке Location"))
 }

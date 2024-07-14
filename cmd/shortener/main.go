@@ -5,17 +5,15 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	//"github.com/go-chi/chi/v5/middleware"
-	"github.com/ivanmolchanov1988/shortener/pkg/handlers"
-	"github.com/ivanmolchanov1988/shortener/pkg/memory"
+	"github.com/ivanmolchanov1988/shortener/internal/handlers"
+	"github.com/ivanmolchanov1988/shortener/internal/memory"
 
-	//"github.com/ivanmolchanov1988/shortener/pkg/server"
-	"github.com/ivanmolchanov1988/shortener/config"
+	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
 func main() {
 	// Конфигурация флагов
-	cfg := config.InitConfig()
+	cfg := server.InitConfig()
 
 	memStore := memory.NewMemoryStorage()
 	handler := handlers.NewHandler(memStore, cfg)

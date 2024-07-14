@@ -8,16 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivanmolchanov1988/shortener/config"
-	"github.com/ivanmolchanov1988/shortener/pkg/memory"
+	"github.com/ivanmolchanov1988/shortener/internal/memory"
+	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // для теста конфига
-var cfg = &config.Config{
+var cfg = &server.Config{
 	Address: "localhost:8080",
-	B_URL:   "http://localhost:8080",
+	BaseURL: "http://localhost:8080",
 }
 
 func init() {

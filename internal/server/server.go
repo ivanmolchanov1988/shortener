@@ -1,4 +1,4 @@
-package config
+package server
 
 import (
 	"flag"
@@ -6,15 +6,12 @@ import (
 	"os"
 )
 
-// Добавил export SERVER_ADDRESS=localhost:8080
-// Добавил export BASE_URL=http://localhost:8080
 type Config struct {
 	Address string
-	B_URL   string
+	BaseURL string
 }
 
 func Usage() {
-	// Версия
 	var version = "0.0.1"
 
 	fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
@@ -46,11 +43,9 @@ func getAddressAndBaseURL() (string, string) {
 
 func InitConfig() *Config {
 
-	// Моя Usage
 	flag.Usage = Usage
 
 	address, baseURL := getAddressAndBaseURL()
-	//flag.Parse()
 
 	if address == "" || baseURL == "" {
 		flag.Usage()
@@ -59,7 +54,7 @@ func InitConfig() *Config {
 
 	return &Config{
 		Address: address,
-		B_URL:   baseURL,
+		BaseURL: baseURL,
 	}
 
 }
