@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -41,20 +42,19 @@ func getAddressAndBaseURL() (string, string) {
 	return address, baseURL
 }
 
-func InitConfig() *Config {
-
+func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
 	address, baseURL := getAddressAndBaseURL()
 
 	if address == "" || baseURL == "" {
 		flag.Usage()
-		os.Exit(1)
+		return nil, errors.New("The address or baseURL is empty")
 	}
 
 	return &Config{
 		Address: address,
 		BaseURL: baseURL,
-	}
+	}, nil
 
 }

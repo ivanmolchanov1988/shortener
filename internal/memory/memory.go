@@ -1,9 +1,13 @@
 package memory
 
-import "errors"
+import (
+	"errors"
+	"sync"
+)
 
 type MemoryStorage struct {
 	data map[string]string
+	mu   sync.RWMutex
 }
 
 func NewMemoryStorage() *MemoryStorage {
@@ -13,14 +17,17 @@ func NewMemoryStorage() *MemoryStorage {
 }
 
 func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
-	if _, exists := m.data[shortURL]; exists {
-		return errors.New("the URL already exists")
-	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.data[shortURL] = originalURL
 	return nil
 }
 
 func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	originalURL, exists := m.data[shortURL]
 	if !exists {
 		return "", errors.New("the URL not found")

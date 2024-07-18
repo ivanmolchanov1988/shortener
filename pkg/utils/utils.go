@@ -2,13 +2,19 @@ package utils
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"math/big"
 )
 
+var allowedChars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+
 func RandStr(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+	b := make([]rune, n)
+	for i := range b {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(allowedChars))))
+		if err != nil {
+			return "", err
+		}
+		b[i] = allowedChars[num.Int64()]
 	}
-	return base64.URLEncoding.EncodeToString(b)[:n], nil
+	return string(b), nil
 }

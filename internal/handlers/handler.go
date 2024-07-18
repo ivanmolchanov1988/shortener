@@ -11,7 +11,7 @@ import (
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
-// interfases
+// interfaces
 type Storage interface {
 	SaveURL(shortURL, originalURL string) error
 	GetURL(shortURL string) (string, error)
@@ -44,6 +44,8 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Unable to read body", http.StatusBadRequest)
 		return
 	}
+	defer req.Body.Close()
+
 	urlStr := string(body)
 	_, err = url.ParseRequestURI(urlStr)
 	if err != nil {
@@ -75,15 +77,16 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")
 	if idLink == "" {
-		http.Error(res, "This ID does not exist", http.StatusBadRequest)
+		http.Error(res, "Invalid or empty ID", http.StatusBadRequest)
 		return
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
-	originURL, err := h.storage.GetURL(idLink)
+	// 404, если не найден
+	originUrl, err := h.storage.GetURL(idLink)
 	if err != nil {
-		http.Error(res, "URL not found", http.StatusBadRequest)
+		http.Error(res, "URL not found", http.StatusNotFound)
 		return
 	}
-	res.Header().Set("Location", originURL)
+	res.Header().Set("Location", originUrl)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
