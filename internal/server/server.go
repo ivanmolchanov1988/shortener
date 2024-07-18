@@ -49,7 +49,7 @@ func InitConfig() (*Config, error) {
 
 	if address == "" || baseURL == "" {
 		flag.Usage()
-		return nil, errors.New("The address or baseURL is empty")
+		return nil, errors.New("the address or baseURL is empty")
 	}
 
 	return &Config{

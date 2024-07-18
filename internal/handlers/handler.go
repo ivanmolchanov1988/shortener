@@ -82,11 +82,11 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
 	// 404, если не найден
-	originUrl, err := h.storage.GetURL(idLink)
+	originURL, err := h.storage.GetURL(idLink)
 	if err != nil {
 		http.Error(res, "URL not found", http.StatusNotFound)
 		return
 	}
-	res.Header().Set("Location", originUrl)
+	res.Header().Set("Location", originURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }

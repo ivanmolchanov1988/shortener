@@ -16,20 +16,20 @@ func main() {
 	// Конфигурация флагов
 	cfg, err := server.InitConfig()
 	if err != nil {
-		memStore := memory.NewMemoryStorage()
-		handler := handlers.NewHandler(memStore, cfg)
-
-		r := chi.NewRouter()
-		r.Post("/", handler.PostURL)
-		r.Get("/{id}", handler.GetURL)
-
-		fmt.Printf("Server start: => %s\n\r", cfg.Address)
-		if err := http.ListenAndServe(cfg.Address, r); err != nil {
-			fmt.Printf("Start with error: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
 		fmt.Printf("InitConfig() with error: %v\n", err)
+		os.Exit(1)
+	}
+
+	memStore := memory.NewMemoryStorage()
+	handler := handlers.NewHandler(memStore, cfg)
+
+	r := chi.NewRouter()
+	r.Post("/", handler.PostURL)
+	r.Get("/{id}", handler.GetURL)
+
+	fmt.Printf("Server start: => %s\n\r", cfg.Address)
+	if err := http.ListenAndServe(cfg.Address, r); err != nil {
+		fmt.Printf("Start with error: %v\n", err)
 		os.Exit(1)
 	}
 
