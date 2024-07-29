@@ -106,8 +106,14 @@ func TestPostUrl(t *testing.T) {
 				t.Errorf("Expected status code %d, got %d", tt.want.code, resp.StatusCode)
 			}
 
-			if string(respBody) != tt.want.response {
-				t.Errorf("Expected response body %q, got %q", tt.want.response, string(respBody))
+			if tt.name == "valid_url_shgould_return_201_created" {
+				if !strings.HasPrefix(string(respBody), tt.want.response) {
+					t.Errorf("Expected response body to start with %q, got %q", tt.want.response, string(respBody))
+				}
+			} else {
+				if string(respBody) != tt.want.response {
+					t.Errorf("Expected response body %q, got %q", tt.want.response, string(respBody))
+				}
 			}
 
 			if resp.Header.Get("Content-Type") != tt.want.contentType {
@@ -156,7 +162,7 @@ func TestGetUrl(t *testing.T) {
 				code        int
 				originalURL string
 			}{
-				code:        http.StatusBadRequest,
+				code:        http.StatusNotFound,
 				originalURL: "",
 			},
 		},

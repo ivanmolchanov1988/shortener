@@ -77,7 +77,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	// #7 парсинг ссылки
 	idLink := strings.TrimPrefix(req.URL.Path, "/")
 	if idLink == "" {
-		http.Error(res, "Invalid or empty ID", http.StatusBadRequest)
+		http.Error(res, "Invalid or empty ID", http.StatusNotFound)
 		return
 	}
 	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
