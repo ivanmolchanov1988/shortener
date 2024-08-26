@@ -9,6 +9,7 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 
+	"github.com/ivanmolchanov1988/shortener/internal/logger"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
@@ -20,10 +21,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Инициализация логгера
+	if err := logger.Initialize(cfg.Logging); err != nil {
+		fmt.Printf("Logger initialization failed: %v\n", err)
+		os.Exit(1)
+	}
+
 	memStore := memory.NewMemoryStorage()
 	handler := handlers.NewHandler(memStore, cfg)
 
 	r := chi.NewRouter()
+
+	// Добавляем middleware логирования к каждому запросу
+	r.Use(logger.RequestLogger)
+
 	r.Post("/", handler.PostURL)
 	r.Get("/{id}", handler.GetURL)
 

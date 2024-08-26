@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Address string
 	BaseURL string
+	Logging string
 }
 
 func Usage() {
@@ -20,12 +21,14 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
-func getAddressAndBaseURL() (string, string) {
+func getAddressAndBaseURL() (string, string, string) {
 	address := os.Getenv("SERVER_ADDRESS")
 	baseURL := os.Getenv("BASE_URL")
+	logging := os.Getenv("LOG_LVL")
 
 	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 
 	flag.Parse()
 
@@ -39,13 +42,16 @@ func getAddressAndBaseURL() (string, string) {
 	} else {
 		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
 	}
-	return address, baseURL
+	if logging == "" {
+		logging = *tempLogging
+	} // добать остальные уровни логирования...
+	return address, baseURL, logging
 }
 
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
-	address, baseURL := getAddressAndBaseURL()
+	address, baseURL, logging := getAddressAndBaseURL()
 
 	if address == "" || baseURL == "" {
 		flag.Usage()
@@ -55,6 +61,7 @@ func InitConfig() (*Config, error) {
 	return &Config{
 		Address: address,
 		BaseURL: baseURL,
+		Logging: logging,
 	}, nil
 
 }
