@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"flag"
 	"io"
 	"net/http"
@@ -143,8 +144,18 @@ func TestShorten(t *testing.T) {
 		t.Fatalf("Failed to read response body: %v", err)
 	}
 
-	expectedResponse := `{"result":"` + cfg.BaseURL + `/shortURL"}`
-	if !strings.Contains(string(body), expectedResponse) {
+	var responseData map[string]string
+	if err := json.Unmarshal(body, &responseData); err != nil {
+		t.Fatalf("Failed to unmarshal response body: %v", err)
+	}
+
+	shortURL, ok := responseData["result"]
+	if !ok {
+		t.Errorf("Response body does not contain 'result'")
+	}
+
+	expectedResponse := `{"result":"` + shortURL + `"}`
+	if string(body) != expectedResponse {
 		t.Errorf("Expected response body %q, got %q", expectedResponse, string(body))
 	}
 
