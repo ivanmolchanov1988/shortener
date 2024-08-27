@@ -36,6 +36,7 @@ func main() {
 	r.Use(logger.RequestLogger)
 
 	r.Post("/", handler.PostURL)
+	r.Post("/api/shorten", handler.Shorten)
 	r.Get("/{id}", handler.GetURL)
 
 	fmt.Printf("Server start: => %s\n\r", cfg.Address)

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -70,6 +71,66 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
 	res.Write([]byte(fullShortURL))
 
+}
+
+// //////// SHORTEN //////////
+func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
+	// Content-Type - application/json
+	if req.Header.Get("Content-Type") != "application/json" {
+		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	// Структура для входящего запроса
+	var requestData struct {
+		URL string `json:"url"`
+	}
+
+	// Декодируем JSON
+	err := json.NewDecoder(req.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(res, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	// Валидность URL
+	_, err = url.ParseRequestURI(requestData.URL)
+	if err != nil {
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	// Генерируем shortLink
+	shortURL, err := utils.RandStr(8)
+	if err != nil {
+		http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
+		return
+	}
+
+	// Сохраняем URL
+	err = h.storage.SaveURL(shortURL, requestData.URL)
+	if err != nil {
+		http.Error(res, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
+
+	// Структуру ответа
+	responseData := struct {
+		Result string `json:"result"`
+	}{
+		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
+	}
+
+	// Заголовок Content-Type для ответа
+	res.Header().Set("Content-Type", "application/json")
+	// 201 Created
+	res.WriteHeader(http.StatusCreated)
+	// responseData в JSON
+	err = json.NewEncoder(res).Encode(responseData)
+	if err != nil {
+		http.Error(res, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // ///////// GET //////////

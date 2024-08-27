@@ -124,6 +124,39 @@ func TestPostUrl(t *testing.T) {
 
 }
 
+func TestShorten(t *testing.T) {
+	memStore := memory.NewMemoryStorage()
+	handler := NewHandler(memStore, cfg)
+
+	urlToSend := `{"url":"https://example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(urlToSend))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	handler.Shorten(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+
+	expectedResponse := `{"result":"` + cfg.BaseURL + `/shortURL"}`
+	if !strings.Contains(string(body), expectedResponse) {
+		t.Errorf("Expected response body %q, got %q", expectedResponse, string(body))
+	}
+
+	if res.StatusCode != http.StatusCreated {
+		t.Errorf("Expected status code %d, got %d", http.StatusCreated, res.StatusCode)
+	}
+
+	if res.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %s", res.Header.Get("Content-Type"))
+	}
+}
+
 func TestGetUrl(t *testing.T) {
 
 	//запись для тестов
