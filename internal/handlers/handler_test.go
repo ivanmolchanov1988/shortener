@@ -154,7 +154,7 @@ func TestShorten(t *testing.T) {
 		t.Errorf("Response body does not contain 'result'")
 	}
 
-	expectedResponse := `{"result":"` + shortURL + `"}\n`
+	expectedResponse := `{"result":"` + shortURL + `"}` + "\n"
 	if string(body) != expectedResponse {
 		t.Errorf("Expected response body %q, got %q", expectedResponse, string(body))
 	}
