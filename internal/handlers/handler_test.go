@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"flag"
 	"io"
@@ -139,7 +141,29 @@ func TestShorten(t *testing.T) {
 	res := w.Result()
 	defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
+	// Тест для компресии
+	var reader io.Reader
+	switch res.Header.Get("Content-Encoding") {
+	case "gzip":
+		gz, err := gzip.NewReader(res.Body)
+		if err != nil {
+			t.Fatalf("Failed to create gzip reader: %v", err)
+		}
+		defer gz.Close()
+		reader = gz
+	case "deflate":
+		zlb, err := zlib.NewReader(res.Body)
+		if err != nil {
+			t.Fatalf("Failed to create zlib reader: %v", err)
+		}
+		defer zlb.Close()
+		reader = zlb
+	default:
+		reader = res.Body
+	}
+
+	//body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		t.Fatalf("Failed to read response body: %v", err)
 	}
