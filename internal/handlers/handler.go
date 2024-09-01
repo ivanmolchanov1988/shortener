@@ -18,8 +18,6 @@ type Storage interface {
 	GetURL(shortURL string) (string, error)
 }
 
-//
-
 type Handler struct {
 	storage Storage
 	config  *server.Config
