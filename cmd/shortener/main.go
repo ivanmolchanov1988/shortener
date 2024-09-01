@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ivanmolchanov1988/shortener/internal/compress"
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 
@@ -29,11 +30,15 @@ func main() {
 
 	memStore := memory.NewMemoryStorage()
 	handler := handlers.NewHandler(memStore, cfg)
+	//compressHandler := compress.NewCompressHandler(handler) // chi тут решает
 
 	r := chi.NewRouter()
 
 	// Добавляем middleware логирования к каждому запросу
 	r.Use(logger.RequestLogger)
+
+	// Применяем middleware сжатия
+	r.Use(compress.NewCompressHandler)
 
 	r.Post("/", handler.PostURL)
 	r.Post("/api/shorten", handler.Shorten)
