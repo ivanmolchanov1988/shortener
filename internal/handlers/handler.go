@@ -51,6 +51,10 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		}
 		defer gz.Close()
 		body, err = io.ReadAll(gz)
+		if err != nil {
+			http.Error(res, "Unable to read body", http.StatusBadRequest)
+			return
+		}
 	} else {
 		body, err = io.ReadAll(req.Body)
 	}
