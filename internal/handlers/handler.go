@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,8 +38,25 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Content-Type must be text/plain or application/x-gzip", http.StatusBadRequest)
 		return
 	}
+
+	// ИНК8 Сжатое тело
+	var body []byte
+	var err error
+
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(req.Body)
+		if err != nil {
+			http.Error(res, "Failed to decompress gzip body", http.StatusBadRequest)
+			return
+		}
+		defer gz.Close()
+		body, err = io.ReadAll(gz)
+	} else {
+		body, err = io.ReadAll(req.Body)
+	}
+
 	// #4.2 Сервер принимает в теле запроса строку URL
-	body, err := io.ReadAll(req.Body)
+	//body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, "Unable to read body", http.StatusBadRequest)
 		return

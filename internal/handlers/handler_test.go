@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"compress/gzip"
 	"compress/zlib"
 	"encoding/json"
@@ -32,6 +33,7 @@ func TestPostUrl(t *testing.T) {
 		name        string
 		contentType string
 		body        string
+		encoding    string
 		want        struct {
 			code        int
 			response    string
@@ -42,6 +44,21 @@ func TestPostUrl(t *testing.T) {
 			name:        "valid_url_shgould_return_201_created",
 			contentType: "text/plain",
 			body:        "https://practicum.yandex.ru/learn/go-advanced/courses/4059e8ec-b819-4c6c-801e-5307db3ff750/sprints/256128/topics/dbfad219-91f2-4f71-948d-953d4c449ad1/lessons/1e1e02c5-f0b0-4f61-97d2-3a7c8d8e9239/",
+			want: struct {
+				code        int
+				response    string
+				contentType string
+			}{
+				code:        http.StatusCreated,
+				response:    "http://localhost:8080/",
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:        "valid_url_with_gzip",
+			contentType: "application/x-gzip",
+			body:        "https://practicum.yandex.ru",
+			encoding:    "gzip",
 			want: struct {
 				code        int
 				response    string
@@ -76,7 +93,7 @@ func TestPostUrl(t *testing.T) {
 				contentType string
 			}{
 				code:        http.StatusBadRequest,
-				response:    "Content-Type must be text/plain\n",
+				response:    "Content-Type must be text/plain or application/x-gzip\n",
 				contentType: "text/plain; charset=utf-8",
 			},
 		},
@@ -86,7 +103,25 @@ func TestPostUrl(t *testing.T) {
 	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
+			var reader io.Reader = strings.NewReader(tt.body)
+			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", nil)
+
+			if tt.encoding == "gzip" {
+				var b bytes.Buffer
+				gz := gzip.NewWriter(&b)
+				if _, err := gz.Write([]byte(tt.body)); err != nil {
+					t.Fatal(err)
+				}
+				if err := gz.Close(); err != nil {
+					t.Fatal(err)
+				}
+				reader = &b
+				req.Body = io.NopCloser(reader)
+				req.Header.Set("Content-Encoding", "gzip")
+			} else {
+				req.Body = io.NopCloser(reader)
+			}
+
 			req.Header.Set("Content-Type", tt.contentType)
 			w := httptest.NewRecorder()
 
@@ -96,20 +131,13 @@ func TestPostUrl(t *testing.T) {
 			defer resp.Body.Close()
 			respBody, err := io.ReadAll(resp.Body)
 
-			//require.NoError(t, err)
-			//assert.Equal(t, tt.want.code, resp.StatusCode)
-			//assert.True(t, strings.HasPrefix(string(respBody), tt.want.response))
-			//assert.Equal(t, tt.want.contentType, resp.Header.Get("Content-Type"))
-
-			if err != nil {
-				t.Fatalf("Unable to read resp body: %v", err)
-			}
+			require.NoError(t, err)
 
 			if resp.StatusCode != tt.want.code {
 				t.Errorf("Expected status code %d, got %d", tt.want.code, resp.StatusCode)
 			}
 
-			if tt.name == "valid_url_shgould_return_201_created" {
+			if tt.name == "valid_url_shgould_return_201_created" || tt.name == "valid_url_with_gzip" {
 				if !strings.HasPrefix(string(respBody), tt.want.response) {
 					t.Errorf("Expected response body to start with %q, got %q", tt.want.response, string(respBody))
 				}
@@ -141,7 +169,6 @@ func TestShorten(t *testing.T) {
 	res := w.Result()
 	defer res.Body.Close()
 
-	// Тест для компресии
 	var reader io.Reader
 	switch res.Header.Get("Content-Encoding") {
 	case "gzip":
@@ -162,7 +189,6 @@ func TestShorten(t *testing.T) {
 		reader = res.Body
 	}
 
-	//body, err := io.ReadAll(res.Body)
 	body, err := io.ReadAll(reader)
 	if err != nil {
 		t.Fatalf("Failed to read response body: %v", err)
@@ -245,11 +271,6 @@ func TestGetUrl(t *testing.T) {
 
 			res := w.Result()
 			defer res.Body.Close()
-
-			// assert.Equal(t, tt.want.code, res.StatusCode)
-			// if tt.want.originalURL != "" {
-			// 	assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
-			// }
 
 			if res.StatusCode != tt.want.code {
 				t.Errorf("Expected status code %d, got %d", tt.want.code, res.StatusCode)
