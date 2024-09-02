@@ -39,6 +39,7 @@ func main() {
 
 	// Применяем middleware сжатия
 	r.Use(compress.NewCompressHandler)
+	r.Use(compress.DecompressHandler)
 
 	r.Post("/", handler.PostURL)
 	r.Post("/api/shorten", handler.Shorten)

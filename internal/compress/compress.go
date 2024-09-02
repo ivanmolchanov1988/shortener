@@ -1,8 +1,10 @@
 package compress
 
 import (
+	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -52,5 +54,29 @@ func NewCompressHandler(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		}
 
+	})
+}
+
+func DecompressHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reader io.ReadCloser
+		switch r.Header.Get("Content-Encoding") {
+		case "gzip":
+			var err error
+			reader, err = gzip.NewReader(r.Body)
+			if err != nil {
+				http.Error(w, "Failed to decompress gzip body", http.StatusBadRequest)
+				return
+			}
+			defer reader.Close()
+			r.Body = reader
+			r.Header.Del("Content-Encoding") // Уже декодировано
+		case "deflate":
+			reader = flate.NewReader(r.Body)
+			defer reader.Close()
+			r.Body = reader
+			r.Header.Del("Content-Encoding") // Удалить
+		}
+		next.ServeHTTP(w, r)
 	})
 }
