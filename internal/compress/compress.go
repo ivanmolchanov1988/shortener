@@ -30,7 +30,9 @@ func (w zlibWriter) Write(b []byte) (int, error) {
 func NewCompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
-		if contentType == "application/json" || contentType == "text/html" {
+		if strings.Contains(contentType, "application/json") ||
+			strings.Contains(contentType, "text/html") ||
+			strings.Contains(contentType, "application/x-gzip") {
 			ae := r.Header.Get("Accept-Encoding")
 			switch {
 			case strings.Contains(ae, "gzip"):

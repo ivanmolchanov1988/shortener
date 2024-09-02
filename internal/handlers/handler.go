@@ -33,8 +33,8 @@ func NewHandler(s Storage, cfg *server.Config) *Handler {
 // //////// POST //////////
 func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	contentType := req.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "text/plain") {
-		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
+	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/x-gzip") {
+		http.Error(res, "Content-Type must be text/plain or application/x-gzip", http.StatusBadRequest)
 		return
 	}
 	// #4.2 Сервер принимает в теле запроса строку URL
