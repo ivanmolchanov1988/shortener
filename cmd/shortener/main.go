@@ -15,7 +15,10 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
-func fileExists(filePath string) error {
+var fileName = "urls.json"
+
+func fileExists(directoryPath string) error {
+	filePath := directoryPath + fileName
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		file, err := os.Create(filePath)
 		if err != nil {
@@ -46,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fileStore := file.NewFileStorage(cfg.FileStoragePath)
+	fileStore := file.NewFileStorage(cfg.FileStoragePath + fileName)
 	memStore, err := memory.NewMemoryStorage(fileStore)
 	if err != nil {
 		fmt.Printf("Error for memStore: %v\n", err)
