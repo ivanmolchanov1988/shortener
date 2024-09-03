@@ -10,6 +10,7 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 
+	"github.com/ivanmolchanov1988/shortener/internal/file"
 	"github.com/ivanmolchanov1988/shortener/internal/logger"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
@@ -28,7 +29,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	memStore := memory.NewMemoryStorage()
+	fileStore := file.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fileStore)
+	if err != nil {
+		fmt.Printf("Error for memStore: %v\n", err)
+		os.Exit(1)
+	}
 	handler := handlers.NewHandler(memStore, cfg)
 	//compressHandler := compress.NewCompressHandler(handler) // chi тут решает
 

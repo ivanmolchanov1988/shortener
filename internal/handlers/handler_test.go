@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ivanmolchanov1988/shortener/internal/file"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/require"
@@ -19,8 +20,9 @@ import (
 
 // для теста конфига
 var cfg = &server.Config{
-	Address: "localhost:8080",
-	BaseURL: "http://localhost:8080",
+	Address:         "localhost:8080",
+	BaseURL:         "http://localhost:8080",
+	FileStoragePath: "../../data/urls.json",
 }
 
 func init() {
@@ -99,7 +101,12 @@ func TestPostUrl(t *testing.T) {
 		},
 	}
 
-	memStore := memory.NewMemoryStorage()
+	//memStore := memory.NewMemoryStorage()
+	fileStore := file.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fileStore)
+	if err != nil {
+		t.Errorf("Error for memStore %v", err)
+	}
 	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -156,7 +163,12 @@ func TestPostUrl(t *testing.T) {
 }
 
 func TestShorten(t *testing.T) {
-	memStore := memory.NewMemoryStorage()
+	//memStore := memory.NewMemoryStorage()
+	fileStore := file.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fileStore)
+	if err != nil {
+		t.Errorf("Error for memStore %v", err)
+	}
 	handler := NewHandler(memStore, cfg)
 
 	urlToSend := `{"url":"https://example.com"}`
@@ -224,11 +236,19 @@ func TestGetUrl(t *testing.T) {
 	testShortURL := "testURL"
 	invalidShortURL := "123321"
 
-	memStore := memory.NewMemoryStorage()
+	//memStore := memory.NewMemoryStorage()
+	fileStore := file.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fileStore)
+	if err != nil {
+		t.Errorf("Error for memStore %v", err)
+	}
 	handler := NewHandler(memStore, cfg)
 
-	err := memStore.SaveURL(testShortURL, "https://testURL123.ru")
-	require.NoError(t, err)
+	//err := memStore.SaveURL(testShortURL, "https://testURL123.ru")
+	if err := memStore.SaveURL(testShortURL, "https://testURL123.ru"); err != nil {
+		require.NoError(t, err)
+	}
+	//require.NoError(t, err)
 
 	tests := []struct { // мне надо передать: URL. Жду: код, original
 		name     string
