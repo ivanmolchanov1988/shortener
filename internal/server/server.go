@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
@@ -23,10 +24,15 @@ func Usage() {
 }
 
 func getFlags() (string, string, string, string) {
+	rootDir, err := getRootProject()
+	if err != nil {
+		fmt.Printf("rootDir error: %s\n", err)
+		os.Exit(1)
+	}
 	tempAddress := flag.String("a", "localhost:8081", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8081", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
-	tempFilePath := flag.String("f", "../../data/", "file for urls data")
+	tempFilePath := flag.String("f", rootDir+"/data/", "file for urls data")
 
 	flag.Parse()
 
@@ -66,11 +72,6 @@ func InitConfig() (*Config, error) {
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
-	// //проверка файла
-	// if err := checkAndCreateFile(filePath); err != nil {
-	// 	return nil, fmt.Errorf("error for fileData: %w", err)
-	// }
-
 	return &Config{
 		Address:         address,
 		BaseURL:         baseURL,
@@ -78,4 +79,25 @@ func InitConfig() (*Config, error) {
 		FileStoragePath: filePath,
 	}, nil
 
+}
+
+func getRootProject() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "project_root_shortener.txt")); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", errors.New("корневой каталог не найден")
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ivanmolchanov1988/shortener/internal/compress"
@@ -15,19 +16,7 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
-var fileName = "urls.json"
-
-func fileExists(directoryPath string) error {
-	filePath := directoryPath + fileName
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		file, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		file.Close()
-	}
-	return nil
-}
+var fileNameForData = "urls.json"
 
 func main() {
 	// Конфигурация флагов
@@ -37,19 +26,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Создание файла для хранения данных
-	if err := fileExists(cfg.FileStoragePath); err != nil {
-		fmt.Printf("Error ensuring file exists: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Инициализация логгера
 	if err := logger.Initialize(cfg.Logging); err != nil {
 		fmt.Printf("Logger initialization failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	fileStore := file.NewFileStorage(cfg.FileStoragePath + fileName)
+	// Файл для хранения
+	filePath := filepath.Join(cfg.FileStoragePath, fileNameForData)
+	fileStore := file.NewFileStorage(filePath)
 	memStore, err := memory.NewMemoryStorage(fileStore)
 	if err != nil {
 		fmt.Printf("Error for memStore: %v\n", err)
