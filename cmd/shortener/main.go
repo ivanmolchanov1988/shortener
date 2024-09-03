@@ -34,7 +34,8 @@ func main() {
 	//filePath := filepath.Clean(cfg.FileStoragePath)
 	//filePath := filepath.Join(cfg.FileStoragePath, "data", "urls.json")
 	//filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
-	filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
+	//filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
+	filePath := cfg.FileStoragePath
 
 	// Создаем все необходимые директории
 	dir := filepath.Dir(filePath)
