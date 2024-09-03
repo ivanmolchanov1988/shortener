@@ -5,8 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 )
+
+// Абсолютный путь к каталогу data в корне проекта и файлу urls.json
+var DefaultFilePath = getDefaultFilePath()
+var dataFileName = "urls.json"
 
 type Config struct {
 	Address         string
@@ -24,15 +28,10 @@ func Usage() {
 }
 
 func getFlags() (string, string, string, string) {
-	rootDir, err := getRootProject()
-	if err != nil {
-		fmt.Printf("rootDir error: %s\n", err)
-		os.Exit(1)
-	}
 	tempAddress := flag.String("a", "localhost:8081", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8081", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
-	tempFilePath := flag.String("f", rootDir+"/data/", "file for urls data")
+	tempFilePath := flag.String("f", DefaultFilePath, "file for urls data")
 
 	flag.Parse()
 
@@ -81,23 +80,17 @@ func InitConfig() (*Config, error) {
 
 }
 
-func getRootProject() (string, error) {
+func getProjectRoot() string {
+	// Используем текущий рабочий каталог как корневой каталог
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		fmt.Println("Error getting current directory:", err)
+		return ""
 	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "project_root_shortener.txt")); err == nil {
-			return dir, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-
-	return "", errors.New("корневой каталог не найден")
+	return dir
+}
+func getDefaultFilePath() string {
+	projectRoot := getProjectRoot()
+	newPath := strings.Replace(projectRoot, "cmd/shortener", "data/"+dataFileName, 1)
+	return newPath
 }

@@ -16,8 +16,6 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
-var fileNameForData = "urls.json"
-
 func main() {
 	// Конфигурация флагов
 	cfg, err := server.InitConfig()
@@ -33,7 +31,8 @@ func main() {
 	}
 
 	// Файл для хранения
-	filePath := filepath.Join(cfg.FileStoragePath, fileNameForData)
+	filePath := filepath.Clean(cfg.FileStoragePath)
+	fmt.Printf("File path: %v\n", filePath)
 	fileStore := file.NewFileStorage(filePath)
 	memStore, err := memory.NewMemoryStorage(fileStore)
 	if err != nil {
