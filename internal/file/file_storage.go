@@ -39,7 +39,8 @@ func (f *FileStorage) SaveURL(shortURL, originalURL string) error {
 		OriginalURL: originalURL,
 	}
 
-	file, err := os.OpenFile(f.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Файл уже есть. Проверка в main.
+	file, err := os.OpenFile(f.filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

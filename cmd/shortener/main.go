@@ -32,6 +32,23 @@ func main() {
 
 	// Файл для хранения
 	filePath := filepath.Clean(cfg.FileStoragePath)
+
+	// Проверяем, есть ли файл
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		fmt.Printf("File does not exist, creating: %v\n", filePath)
+		file, err := os.Create(filePath)
+		if err != nil {
+			fmt.Printf("Error creating file: %v\n", err)
+			os.Exit(1)
+		}
+		file.Close()
+	} else if err != nil {
+		fmt.Printf("Error checking file: %v\n", err)
+		os.Exit(1)
+	} else {
+		fmt.Printf("File exists: %v\n", filePath)
+	}
+
 	fmt.Printf("File path: %v\n", filePath)
 	fileStore := file.NewFileStorage(filePath)
 	memStore, err := memory.NewMemoryStorage(fileStore)
