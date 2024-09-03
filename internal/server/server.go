@@ -12,7 +12,7 @@ import (
 // var DefaultFilePath = getDefaultFilePath()
 
 // Имя файла-хранилища
-var dataFileName = "urls.json"
+//var dataFileName = "urls.json"
 
 type Config struct {
 	Address         string
@@ -94,6 +94,6 @@ func getProjectRoot() string {
 }
 func getDefaultFilePath() string {
 	projectRoot := getProjectRoot()
-	newPath := strings.Replace(projectRoot, "cmd/shortener", "data/", 1)
+	newPath := strings.Replace(projectRoot, "cmd/shortener", "", 1)
 	return newPath
 }
