@@ -9,7 +9,9 @@ import (
 )
 
 // Абсолютный путь к каталогу data в корне проекта и файлу urls.json
-var DefaultFilePath = getDefaultFilePath()
+// var DefaultFilePath = getDefaultFilePath()
+
+// Имя файла-хранилища
 var dataFileName = "urls.json"
 
 type Config struct {
@@ -31,7 +33,7 @@ func getFlags() (string, string, string, string) {
 	tempAddress := flag.String("a", "localhost:8081", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8081", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
-	tempFilePath := flag.String("f", DefaultFilePath, "file for urls data")
+	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
 
 	flag.Parse()
 
@@ -39,6 +41,7 @@ func getFlags() (string, string, string, string) {
 	baseURL := os.Getenv("BASE_URL")
 	logging := os.Getenv("LOG_LVL")
 	filePath := os.Getenv("FILE_STORAGE_PATH")
+	//filePath = filePath + dataFileName
 
 	if address == "" {
 		address = *tempAddress
@@ -75,7 +78,7 @@ func InitConfig() (*Config, error) {
 		Address:         address,
 		BaseURL:         baseURL,
 		Logging:         logging,
-		FileStoragePath: filePath,
+		FileStoragePath: filePath + dataFileName,
 	}, nil
 
 }
@@ -91,6 +94,6 @@ func getProjectRoot() string {
 }
 func getDefaultFilePath() string {
 	projectRoot := getProjectRoot()
-	newPath := strings.Replace(projectRoot, "cmd/shortener", "data/"+dataFileName, 1)
+	newPath := strings.Replace(projectRoot, "cmd/shortener", "data/", 1)
 	return newPath
 }
