@@ -94,6 +94,6 @@ func getProjectRoot() string {
 }
 func getDefaultFilePath() string {
 	projectRoot := getProjectRoot()
-	newPath := strings.Replace(projectRoot, "cmd/shortener", "", 1)
+	newPath := strings.Replace(projectRoot, "cmd/shortener", "urls.json", 1)
 	return newPath
 }
