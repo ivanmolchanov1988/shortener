@@ -32,7 +32,8 @@ func main() {
 
 	// Файл для хранения
 	//filePath := filepath.Clean(cfg.FileStoragePath)
-	filePath := filepath.Join(cfg.FileStoragePath, "data", "urls.json")
+	//filePath := filepath.Join(cfg.FileStoragePath, "data", "urls.json")
+	filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
 	fmt.Printf("File path: %v\n", filePath)
 
 	// Проверяем, есть ли файл
