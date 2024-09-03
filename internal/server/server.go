@@ -23,8 +23,8 @@ func Usage() {
 }
 
 func getFlags() (string, string, string, string) {
-	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
-	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+	tempAddress := flag.String("a", "localhost:8081", "address to start the HTTP server")
+	tempBaseURL := flag.String("b", "http://localhost:8081", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", "../../data/urls.json", "file for urls data")
 

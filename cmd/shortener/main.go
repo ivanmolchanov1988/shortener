@@ -21,7 +21,7 @@ func fileExists(filePath string) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		file.Close()
 	}
 	return nil
 }
