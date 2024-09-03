@@ -33,14 +33,23 @@ func main() {
 	// Файл для хранения
 	//filePath := filepath.Clean(cfg.FileStoragePath)
 	//filePath := filepath.Join(cfg.FileStoragePath, "data", "urls.json")
-	filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
+	//filePath := filepath.Join(cfg.FileStoragePath, "urls.json")
+	var filePath string
+	// Если путь не содержит расширение, предполагаем, что это директория
+	if filepath.Ext(cfg.FileStoragePath) == "" {
+		filePath = filepath.Join(cfg.FileStoragePath, "urls.json")
+	} else {
+		// Иначе используем путь как файл напрямую
+		filePath = cfg.FileStoragePath
+	}
+
 	fmt.Printf("File path: %v\n", filePath)
 
-	// Проверяем, есть ли файл
+	// Проверяем наличие директории, если путь указывает на директорию
 	dir := filepath.Dir(filePath)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		fmt.Printf("Directory does not exist, creating: %v\n", dir)
-		err = os.MkdirAll(dir, 0755) // Создает все промежуточные директории
+		err = os.MkdirAll(dir, 0755)
 		if err != nil {
 			fmt.Printf("Error creating directory: %v\n", err)
 			os.Exit(1)
