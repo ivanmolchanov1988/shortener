@@ -78,7 +78,7 @@ func InitConfig() (*Config, error) {
 		Address:         address,
 		BaseURL:         baseURL,
 		Logging:         logging,
-		FileStoragePath: filePath + dataFileName,
+		FileStoragePath: filePath,
 	}, nil
 
 }
