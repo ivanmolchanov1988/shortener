@@ -71,6 +71,8 @@ func main() {
 		fmt.Printf("Error for memStore: %v\n", err)
 		os.Exit(1)
 	}
+
+	//хэндлеры
 	handler := handlers.NewHandler(memStore, cfg)
 	//compressHandler := compress.NewCompressHandler(handler) // chi тут решает
 

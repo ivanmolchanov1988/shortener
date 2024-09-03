@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 )
 
 // Абсолютный путь к каталогу data в корне проекта и файлу urls.json
@@ -94,6 +94,7 @@ func getProjectRoot() string {
 }
 func getDefaultFilePath() string {
 	projectRoot := getProjectRoot()
-	newPath := strings.Replace(projectRoot, "cmd/shortener", "urls.json", 1)
+	//newPath := strings.Replace(projectRoot, "cmd/shortener", "urls.json", 1)
+	newPath := filepath.Join(projectRoot, "urls.json")
 	return newPath
 }
