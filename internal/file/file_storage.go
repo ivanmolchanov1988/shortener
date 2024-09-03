@@ -28,14 +28,14 @@ func NewFileStorage(filePath string) *FileStorage {
 	}
 }
 
-func (f *FileStorage) SaveURL(shortUrl, originalURL string) error {
+func (f *FileStorage) SaveURL(shortURL, originalURL string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	uuid := utils.GenUUID()
 	newShortLinkData := ShortLinkData{
 		UUID:        uuid,
-		ShortURL:    shortUrl,
+		ShortURL:    shortURL,
 		OriginalURL: originalURL,
 	}
 
