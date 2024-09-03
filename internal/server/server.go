@@ -66,10 +66,10 @@ func InitConfig() (*Config, error) {
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
-	//проверка файла
-	if err := checkAndCreateFile(filePath); err != nil {
-		return nil, fmt.Errorf("error for fileData: %w", err)
-	}
+	// //проверка файла
+	// if err := checkAndCreateFile(filePath); err != nil {
+	// 	return nil, fmt.Errorf("error for fileData: %w", err)
+	// }
 
 	return &Config{
 		Address:         address,
@@ -78,27 +78,4 @@ func InitConfig() (*Config, error) {
 		FileStoragePath: filePath,
 	}, nil
 
-}
-
-func checkAndCreateFile(filePath string) error {
-	// Проверка существования файла
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("Creating new file: %s\n", filePath)
-		return createNewFile(filePath)
-	} else if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func createNewFile(filePath string) error {
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	fmt.Println("File created:", filePath)
-	return nil
 }

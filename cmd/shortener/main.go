@@ -15,11 +15,28 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 )
 
+func fileExists(filePath string) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+	}
+	return nil
+}
+
 func main() {
 	// Конфигурация флагов
 	cfg, err := server.InitConfig()
 	if err != nil {
 		fmt.Printf("InitConfig() with error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Создание файла для хранения данных
+	if err := fileExists(cfg.FileStoragePath); err != nil {
+		fmt.Printf("Error ensuring file exists: %v\n", err)
 		os.Exit(1)
 	}
 
