@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivanmolchanov1988/shortener/internal/file"
+	"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/require"
@@ -102,8 +102,8 @@ func TestPostUrl(t *testing.T) {
 	}
 
 	//memStore := memory.NewMemoryStorage()
-	fileStore := file.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fileStore)
+	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}
@@ -164,8 +164,8 @@ func TestPostUrl(t *testing.T) {
 
 func TestShorten(t *testing.T) {
 	//memStore := memory.NewMemoryStorage()
-	fileStore := file.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fileStore)
+	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}
@@ -236,19 +236,16 @@ func TestGetUrl(t *testing.T) {
 	testShortURL := "testURL"
 	invalidShortURL := "123321"
 
-	//memStore := memory.NewMemoryStorage()
-	fileStore := file.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fileStore)
+	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
+	memStore, err := memory.NewMemoryStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}
 	handler := NewHandler(memStore, cfg)
 
-	//err := memStore.SaveURL(testShortURL, "https://testURL123.ru")
 	if err := memStore.SaveURL(testShortURL, "https://testURL123.ru"); err != nil {
 		require.NoError(t, err)
 	}
-	//require.NoError(t, err)
 
 	tests := []struct { // мне надо передать: URL. Жду: код, original
 		name     string

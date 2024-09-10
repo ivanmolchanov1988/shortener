@@ -60,7 +60,6 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// #4.2 Сервер принимает в теле запроса строку URL
-	//body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, "Unable to read body", http.StatusBadRequest)
 		return

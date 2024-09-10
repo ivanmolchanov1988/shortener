@@ -64,6 +64,5 @@ func RequestLogger(h http.Handler) http.Handler {
 			zap.Duration("duration", duration),
 			zap.Int("size", lw.size),
 		)
-		//h(w, r)
 	})
 }

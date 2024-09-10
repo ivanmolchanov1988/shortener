@@ -1,4 +1,4 @@
-package file
+package filestore
 
 import (
 	"bufio"
@@ -52,42 +52,6 @@ func (f *FileStorage) SaveURL(shortURL, originalURL string) error {
 	}
 
 	return nil
-}
-
-// Не нужон, переделал на разовую синхронизацию
-// func (f *FileStorage) GetURL(shortUrl string) (string, error) {
-// 	f.mu.RLock()
-// 	defer f.mu.RUnlock()
-
-// 	data, err := f.loadData()
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	shortLinkData, exist := data[shortUrl]
-// 	if !exist {
-// 		return "", errors.New("URL not found for " + shortUrl)
-// 	}
-
-// 	return shortLinkData.OriginalURL, nil
-// }
-
-func (f *FileStorage) loadData() ([]ShortLinkData, error) {
-	file, err := os.Open(f.filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var data []ShortLinkData
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
-
 }
 
 func (f *FileStorage) saveData(data []ShortLinkData) error {

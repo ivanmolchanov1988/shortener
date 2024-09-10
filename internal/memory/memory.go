@@ -4,21 +4,16 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ivanmolchanov1988/shortener/internal/file"
+	"github.com/ivanmolchanov1988/shortener/internal/filestore"
 )
 
 type MemoryStorage struct {
 	data        map[string]string
-	fileStorage *file.FileStorage
+	fileStorage *filestore.FileStorage
 	mu          sync.RWMutex
 }
 
-//	func NewMemoryStorage() *MemoryStorage {
-//		return &MemoryStorage{
-//			data: make(map[string]string),
-//		}
-//	}
-func NewMemoryStorage(fileStorage *file.FileStorage) (*MemoryStorage, error) {
+func NewMemoryStorage(fileStorage *filestore.FileStorage) (*MemoryStorage, error) {
 	memStorage := &MemoryStorage{
 		data:        make(map[string]string),
 		fileStorage: fileStorage,
@@ -38,7 +33,9 @@ func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
 
 	m.data[shortURL] = originalURL
 	// в файл
-	m.fileStorage.SaveURL(shortURL, originalURL)
+	if err := m.fileStorage.SaveURL(shortURL, originalURL); err != nil {
+		return err
+	}
 
 	return nil
 }

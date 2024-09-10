@@ -8,17 +8,47 @@ import (
 	"path/filepath"
 )
 
-// Абсолютный путь к каталогу data в корне проекта и файлу urls.json
-// var DefaultFilePath = getDefaultFilePath()
-
-// Имя файла-хранилища
-//var dataFileName = "urls.json"
-
 type Config struct {
 	Address         string
 	BaseURL         string
 	Logging         string
 	FileStoragePath string
+}
+
+type FlagsConfig struct {
+	Address  string
+	BaseURL  string
+	FilePath string
+	Logging  string
+}
+
+func CreateDirectories(filePath string) error {
+	dir := filepath.Dir(filePath)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		fmt.Printf("Directory does not exist, creating: %v\n", dir)
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return fmt.Errorf("error creating directory: %w", err)
+		}
+	}
+	return nil
+}
+
+// Проверяем наличие файла и создаем его, если он отсутствует
+func CreateFileIfNotExist(filePath string) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		fmt.Printf("File does not exist, creating: %v\n", filePath)
+		file, err := os.Create(filePath)
+		if err != nil {
+			return fmt.Errorf("error creating file: %w", err)
+		}
+		file.Close()
+	} else if err != nil {
+		return fmt.Errorf("error checking file: %w", err)
+	} else {
+		fmt.Printf("File exists: %v\n", filePath)
+	}
+	return nil
 }
 
 func Usage() {
@@ -29,7 +59,7 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
-func getFlags() (string, string, string, string) {
+func getFlags() FlagsConfig {
 	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
@@ -41,7 +71,6 @@ func getFlags() (string, string, string, string) {
 	baseURL := os.Getenv("BASE_URL")
 	logging := os.Getenv("LOG_LVL")
 	filePath := os.Getenv("FILE_STORAGE_PATH")
-	//filePath = filePath + dataFileName
 
 	if address == "" {
 		address = *tempAddress
@@ -61,24 +90,48 @@ func getFlags() (string, string, string, string) {
 	if logging == "" {
 		logging = *tempLogging
 	} // добать остальные уровни логирования...
-	return address, baseURL, filePath, logging
+
+	return FlagsConfig{
+		Address:  address,
+		BaseURL:  baseURL,
+		FilePath: filePath,
+		Logging:  logging,
+	}
+}
+
+func InitConfigAndPrepareStorage() (*Config, error) {
+	cfg, err := InitConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Создание директорий и файлов
+	if err := CreateDirectories(cfg.FileStoragePath); err != nil {
+		return nil, err
+	}
+
+	if err := CreateFileIfNotExist(cfg.FileStoragePath); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
-	address, baseURL, filePath, logging := getFlags()
+	flags := getFlags()
 
-	if address == "" || baseURL == "" {
+	if flags.Address == "" || flags.BaseURL == "" {
 		flag.Usage()
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
 	return &Config{
-		Address:         address,
-		BaseURL:         baseURL,
-		Logging:         logging,
-		FileStoragePath: filePath,
+		Address:         flags.Address,
+		BaseURL:         flags.BaseURL,
+		Logging:         flags.Logging,
+		FileStoragePath: flags.FilePath,
 	}, nil
 
 }
@@ -94,7 +147,6 @@ func getProjectRoot() string {
 }
 func getDefaultFilePath() string {
 	projectRoot := getProjectRoot()
-	//newPath := strings.Replace(projectRoot, "cmd/shortener", "urls.json", 1)
 	newPath := filepath.Join(projectRoot, "urls.json")
 	return newPath
 }
