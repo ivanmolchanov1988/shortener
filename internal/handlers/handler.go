@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,8 +19,6 @@ type Storage interface {
 	GetURL(shortURL string) (string, error)
 }
 
-//
-
 type Handler struct {
 	storage Storage
 	config  *server.Config
@@ -34,12 +34,32 @@ func NewHandler(s Storage, cfg *server.Config) *Handler {
 // //////// POST //////////
 func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	contentType := req.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "text/plain") {
-		http.Error(res, "Content-Type must be text/plain", http.StatusBadRequest)
+	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/x-gzip") {
+		http.Error(res, "Content-Type must be text/plain or application/x-gzip", http.StatusBadRequest)
 		return
 	}
+
+	// ИНК8 Сжатое тело
+	var body []byte
+	var err error
+
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(req.Body)
+		if err != nil {
+			http.Error(res, "Failed to decompress gzip body", http.StatusBadRequest)
+			return
+		}
+		defer gz.Close()
+		body, err = io.ReadAll(gz)
+		if err != nil {
+			http.Error(res, "Unable to read body", http.StatusBadRequest)
+			return
+		}
+	} else {
+		body, err = io.ReadAll(req.Body)
+	}
+
 	// #4.2 Сервер принимает в теле запроса строку URL
-	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, "Unable to read body", http.StatusBadRequest)
 		return
@@ -70,6 +90,66 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
 	res.Write([]byte(fullShortURL))
 
+}
+
+// //////// SHORTEN //////////
+func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
+	// Content-Type - application/json
+	if req.Header.Get("Content-Type") != "application/json" {
+		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	// Структура для входящего запроса
+	var requestData struct {
+		URL string `json:"url"`
+	}
+
+	// Декодируем JSON
+	err := json.NewDecoder(req.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(res, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	// Валидность URL
+	_, err = url.ParseRequestURI(requestData.URL)
+	if err != nil {
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	// Генерируем shortLink
+	shortURL, err := utils.RandStr(8)
+	if err != nil {
+		http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
+		return
+	}
+
+	// Сохраняем URL
+	err = h.storage.SaveURL(shortURL, requestData.URL)
+	if err != nil {
+		http.Error(res, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
+
+	// Структуру ответа
+	responseData := struct {
+		Result string `json:"result"`
+	}{
+		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
+	}
+
+	// Заголовок Content-Type для ответа
+	res.Header().Set("Content-Type", "application/json")
+	// 201 Created
+	res.WriteHeader(http.StatusCreated)
+	// responseData в JSON
+	err = json.NewEncoder(res).Encode(responseData)
+	if err != nil {
+		http.Error(res, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // ///////// GET //////////
