@@ -30,7 +30,7 @@ func main() {
 	}
 
 	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fStore)
+	memStore, err := memory.NewStorage(fStore)
 	if err != nil {
 		fmt.Printf("Error for memStore: %v\n", err)
 		os.Exit(1)

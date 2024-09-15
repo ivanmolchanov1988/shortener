@@ -103,7 +103,7 @@ func TestPostUrl(t *testing.T) {
 
 	//memStore := memory.NewMemoryStorage()
 	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fStore)
+	memStore, err := memory.NewStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}
@@ -165,7 +165,7 @@ func TestPostUrl(t *testing.T) {
 func TestShorten(t *testing.T) {
 	//memStore := memory.NewMemoryStorage()
 	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fStore)
+	memStore, err := memory.NewStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}
@@ -237,7 +237,7 @@ func TestGetUrl(t *testing.T) {
 	invalidShortURL := "123321"
 
 	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewMemoryStorage(fStore)
+	memStore, err := memory.NewStorage(fStore)
 	if err != nil {
 		t.Errorf("Error for memStore %v", err)
 	}

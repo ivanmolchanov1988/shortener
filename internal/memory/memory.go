@@ -13,7 +13,7 @@ type MemoryStorage struct {
 	mu          sync.RWMutex
 }
 
-func NewMemoryStorage(fileStorage *filestore.FileStorage) (*MemoryStorage, error) {
+func NewStorage(fileStorage *filestore.FileStorage) (*MemoryStorage, error) {
 	memStorage := &MemoryStorage{
 		data:        make(map[string]string),
 		fileStorage: fileStorage,
