@@ -13,6 +13,8 @@ type Config struct {
 	BaseURL         string
 	Logging         string
 	FileStoragePath string
+	//db
+	DATABASE_DSN string
 }
 
 type FlagsConfig struct {
@@ -20,6 +22,8 @@ type FlagsConfig struct {
 	BaseURL  string
 	FilePath string
 	Logging  string
+	//db
+	DATABASE_DSN string
 }
 
 func CreateDirectories(filePath string) error {
@@ -64,6 +68,8 @@ func getFlags() FlagsConfig {
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
+	//db
+	tempDB := flag.String("d", "host=localhost port=5432 user=postgres password=password dbname=shortener sslmode=disable", "PostgreSQL DSN (Data Source Name)")
 
 	flag.Parse()
 
@@ -71,31 +77,38 @@ func getFlags() FlagsConfig {
 	baseURL := os.Getenv("BASE_URL")
 	logging := os.Getenv("LOG_LVL")
 	filePath := os.Getenv("FILE_STORAGE_PATH")
+	dbDSN := os.Getenv("DATABASE_DSN")
 
 	if address == "" {
 		address = *tempAddress
 	} else {
-		fmt.Printf("Using ENV for address: %s\n", address)
+		fmt.Printf("Using ENV(SERVER_ADDRESS) for address: %s\n", address)
 	}
 	if baseURL == "" {
 		baseURL = *tempBaseURL
 	} else {
-		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
+		fmt.Printf("Using ENV(BASE_URL) for baseURL: %s\n", baseURL)
 	}
 	if filePath == "" {
 		filePath = *tempFilePath
 	} else {
-		fmt.Printf("Using ENV for file path: %s\n", filePath)
+		fmt.Printf("Using ENV(FILE_STORAGE_PATH) for file path: %s\n", filePath)
+	}
+	if dbDSN == "" {
+		dbDSN = *tempDB
+	} else {
+		fmt.Printf("Using ENV(DATABASE_DSN) for addressDB: %s\n", filePath)
 	}
 	if logging == "" {
 		logging = *tempLogging
 	} // добать остальные уровни логирования...
 
 	return FlagsConfig{
-		Address:  address,
-		BaseURL:  baseURL,
-		FilePath: filePath,
-		Logging:  logging,
+		Address:      address,
+		BaseURL:      baseURL,
+		FilePath:     filePath,
+		Logging:      logging,
+		DATABASE_DSN: dbDSN,
 	}
 }
 
@@ -132,6 +145,8 @@ func InitConfig() (*Config, error) {
 		BaseURL:         flags.BaseURL,
 		Logging:         flags.Logging,
 		FileStoragePath: flags.FilePath,
+		//db
+		DATABASE_DSN: flags.DATABASE_DSN,
 	}, nil
 
 }

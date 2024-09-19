@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"compress/gzip"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,7 +40,6 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ИНК8 Сжатое тело
 	var body []byte
 	var err error
 
@@ -169,4 +169,17 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Location", originURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+// DB ping
+func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
+	dbDSN := h.config.DATABASE_DSN
+	db, err := sql.Open("postgres", dbDSN)
+	if err != nil {
+		http.Error(res, "Failed to connect to database", http.StatusInternalServerError)
+	}
+	defer db.Close()
+
+	res.WriteHeader(http.StatusOK)
+
 }
