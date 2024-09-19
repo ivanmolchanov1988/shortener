@@ -13,6 +13,10 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/logger"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
+
+	"database/sql"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -29,12 +33,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Файловое хранилище
 	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
 	memStore, err := memory.NewStorage(fStore)
 	if err != nil {
 		fmt.Printf("Error for memStore: %v\n", err)
 		os.Exit(1)
 	}
+
+	//DATA BASE
+	dbDSN := cfg.DatabaseDsn
+	db, err := sql.Open("postgres", dbDSN)
+	if err != nil {
+		fmt.Printf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
 
 	//хэндлеры
 	handler := handlers.NewHandler(memStore, cfg)
@@ -51,6 +64,7 @@ func main() {
 	r.Post("/", handler.PostURL)
 	r.Post("/api/shorten", handler.Shorten)
 	r.Get("/{id}", handler.GetURL)
+	r.Get("/ping", handler.GetPingDB)
 
 	fmt.Printf("Server start: => %s\n\r", cfg.Address)
 	if err := http.ListenAndServe(cfg.Address, r); err != nil {
