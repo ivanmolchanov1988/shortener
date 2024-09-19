@@ -173,7 +173,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 
 // DB ping
 func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
-	dbDSN := h.config.DATABASE_DSN
+	dbDSN := h.config.DatabaseDsn
 	db, err := sql.Open("postgres", dbDSN)
 	if err != nil {
 		http.Error(res, "Failed to connect to database", http.StatusInternalServerError)

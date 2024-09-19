@@ -14,7 +14,7 @@ type Config struct {
 	Logging         string
 	FileStoragePath string
 	//db
-	DATABASE_DSN string
+	DatabaseDsn string
 }
 
 type FlagsConfig struct {
@@ -23,7 +23,7 @@ type FlagsConfig struct {
 	FilePath string
 	Logging  string
 	//db
-	DATABASE_DSN string
+	DatabaseDsn string
 }
 
 func CreateDirectories(filePath string) error {
@@ -104,11 +104,11 @@ func getFlags() FlagsConfig {
 	} // добать остальные уровни логирования...
 
 	return FlagsConfig{
-		Address:      address,
-		BaseURL:      baseURL,
-		FilePath:     filePath,
-		Logging:      logging,
-		DATABASE_DSN: dbDSN,
+		Address:     address,
+		BaseURL:     baseURL,
+		FilePath:    filePath,
+		Logging:     logging,
+		DatabaseDsn: dbDSN,
 	}
 }
 
@@ -146,7 +146,7 @@ func InitConfig() (*Config, error) {
 		Logging:         flags.Logging,
 		FileStoragePath: flags.FilePath,
 		//db
-		DATABASE_DSN: flags.DATABASE_DSN,
+		DatabaseDsn: flags.DatabaseDsn,
 	}, nil
 
 }

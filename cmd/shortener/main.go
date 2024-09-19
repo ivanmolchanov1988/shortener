@@ -42,7 +42,7 @@ func main() {
 	}
 
 	//DATA BASE
-	dbDSN := cfg.DATABASE_DSN
+	dbDSN := cfg.DatabaseDsn
 	db, err := sql.Open("postgres", dbDSN)
 	if err != nil {
 		fmt.Printf("Failed to connect to database: %v", err)
