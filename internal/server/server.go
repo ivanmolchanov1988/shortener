@@ -72,9 +72,9 @@ func getFlags() FlagsConfig {
 	//db
 	dsn4flag := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		baseDSN.host, baseDSN.port, baseDSN.user, baseDSN.password, baseDSN.dbname, baseDSN.sslmode)
-	tempDB := flag.String("d", dsn4flag, "PostgreSQL DSN")
+	tempDB := flag.String("d", dsn4flag, "Postgre DSN")
 	//OR
-	//tempDB := flag.String("d", "", "PostgreSQL DSN (Data Source Name)")
+	//tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 
 	flag.Parse()
 
@@ -120,7 +120,7 @@ func getFlags() FlagsConfig {
 func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	cfg, err := InitConfig()
 	if err != nil {
-		log.Println("Config is failed: %v\n", err)
+		log.Printf("Config is failed: %v\n", err)
 		return nil, nil, fmt.Errorf("config initialization failed: %w", err)
 	}
 	if cfg == nil {
@@ -130,39 +130,43 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	var store storage.Storage
 
 	// Определение типа хранилища
-	switch {
-	case cfg.DatabaseDsn != "":
-		db, err := initializeDatabase(cfg.DatabaseDsn)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to initialize database: %w", err)
+	if cfg != nil {
+		switch {
+		case cfg.DatabaseDsn != "":
+			db, err := initializeDatabase(cfg.DatabaseDsn)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to initialize database: %w", err)
+			}
+			store, err = postgr.NewPostgresStorage(db)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+			}
+			log.Println("Storage initialized with Postgre")
+		case cfg.FileStoragePath != "":
+			store, err = filestore.NewFileStorage(cfg.FileStoragePath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
+			}
+			log.Println("Storage initialized with file storage")
+		default:
+			store = memory.NewMemoryStorage()
+			log.Println("Using mem storage")
 		}
-		store, err = postgr.NewPostgresStorage(db)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
-		}
-		log.Println("Storage initialized with PostgreSQL")
-	case cfg.FileStoragePath != "":
-		store, err = filestore.NewFileStorage(cfg.FileStoragePath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
-		}
-		log.Println("Storage initialized with file storage")
-	default:
-		store = memory.NewMemoryStorage()
-		log.Println("Using mem storage")
-	}
 
-	return cfg, store, nil
+		return cfg, store, nil
+	} else {
+		return nil, nil, fmt.Errorf("failed from config: %w", err)
+	}
 }
 
 func creteDBconnection(dbDSN string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbDSN)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to database: %v", err)
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	// Проверка подключения
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("Failed to connect to database: %v", err)
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	return db, nil
 
@@ -171,33 +175,33 @@ func creteDBconnection(dbDSN string) (*sql.DB, error) {
 // func initializeDatabase(db *sql.DB) error {
 func initializeDatabase(dbDSN string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbDSN)
-	if db == nil {
-		return nil, errors.New("DB connection is nil")
+	if db == nil || err != nil {
+		return nil, errors.New("db connection is nil or return erro")
 	}
 
 	// миграции
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create migrate: %v", err)
+		return nil, fmt.Errorf("failed to create migrate: %v", err)
 	}
 	rootPath := getShortRoot()
 	files, err := os.ReadDir(rootPath + "/internal/migrations")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read migrations directory: %v", err)
+		return nil, fmt.Errorf("failed to read migrations directory: %v", err)
 	}
 	for _, file := range files {
-		log.Printf("Found migration file: %s", file.Name())
+		log.Printf("found migration file: %s", file.Name())
 	}
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://"+rootPath+"/internal/migrations",
 		baseDSN.dbname,
 		driver)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to initialize migrate: %v", err)
+		return nil, fmt.Errorf("failed to initialize migrate: %v", err)
 	}
 	//запуск миграции
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return nil, fmt.Errorf("Failed to apply migrate: %v", err)
+		return nil, fmt.Errorf("failed to apply migrate: %v", err)
 	}
 	log.Println("Migration is complete!")
 
@@ -270,8 +274,6 @@ func CreateFileIfNotExist(filePath string) error {
 		file.Close()
 	} else if err != nil {
 		return fmt.Errorf("error checking file: %w", err)
-	} else {
-		//log.Printf("File exists: %v\n", filePath)
 	}
 	return nil
 }
