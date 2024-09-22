@@ -6,26 +6,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/ivanmolchanov1988/shortener/internal/server"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
 // interfaces
-type Storage interface {
-	SaveURL(shortURL, originalURL string) error
-	GetURL(shortURL string) (string, error)
-}
+// type Storage interface {
+// 	SaveURL(shortURL, originalURL string) error
+// 	GetURL(shortURL string) (string, error)
+// }
+
+//var _ storage.Storage = (*Storage)(nil)
 
 type Handler struct {
-	storage Storage
+	storage storage.Storage
 	config  *server.Config
 }
 
-func NewHandler(s Storage, cfg *server.Config) *Handler {
+func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
+	if cfg == nil {
+		panic("can't be nil for cfg")
+	}
+	if s == nil {
+		panic("can't be nil for storage")
+	}
+
 	return &Handler{
 		storage: s,
 		config:  cfg,
@@ -80,7 +91,15 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Сохраним URL
-	h.storage.SaveURL(shortURL, urlStr)
+	//h.storage.SaveURL(shortURL, urlStr)
+	id := utils.GenUUID()
+	err = h.storage.SaveURL(id, shortURL, urlStr)
+	if err != nil {
+		log.Printf("Failed to save URL: %v", err)
+		http.Error(res, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Successfully saved URL: shortURL=%s, originalURL=%s", shortURL, urlStr)
 
 	// #2 Header Content-Type = text/plain
 	res.Header().Set("Content-Type", "text/plain")
@@ -126,8 +145,10 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	id := utils.GenUUID()
+
 	// Сохраняем URL
-	err = h.storage.SaveURL(shortURL, requestData.URL)
+	err = h.storage.SaveURL(id, shortURL, requestData.URL)
 	if err != nil {
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
 		return
