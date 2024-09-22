@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ivanmolchanov1988/shortener/internal/filestore"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
 type MemoryStorage struct {
@@ -13,30 +14,16 @@ type MemoryStorage struct {
 	mu          sync.RWMutex
 }
 
-func NewStorage(fileStorage *filestore.FileStorage) (*MemoryStorage, error) {
-	memStorage := &MemoryStorage{
-		data:        make(map[string]string),
-		fileStorage: fileStorage,
+func NewMemoryStorage() *MemoryStorage {
+	return &MemoryStorage{
+		data: make(map[string]string),
 	}
-
-	// Загрузка даты из файла
-	if err := memStorage.loadDataFromFile(); err != nil {
-		return nil, err
-	}
-
-	return memStorage, nil
 }
 
-func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
+func (m *MemoryStorage) SaveURL(id, shortURL, originalURL string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	m.data[shortURL] = originalURL
-	// в файл
-	if err := m.fileStorage.SaveURL(shortURL, originalURL); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -46,23 +33,9 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		return "", errors.New("the URL not found")
+		return "", errors.New("URL not found")
 	}
 	return originalURL, nil
 }
 
-func (m *MemoryStorage) loadDataFromFile() error {
-	data, err := m.fileStorage.LoadDataFromFile()
-	if err != nil {
-		return err
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, item := range data {
-		m.data[item.ShortURL] = item.OriginalURL
-	}
-
-	return nil
-}
+var _ storage.Storage = (*MemoryStorage)(nil)
