@@ -23,6 +23,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("INIT is failed: %v\n", err)
 	}
+	fmt.Printf("Initialized config: %+v\n", cfg)
+	fmt.Printf("Storage type: %T\n", store)
 	// if store == nil {
 	// 	log.Fatalf("CFG is failed: %v\n", store)
 	// }

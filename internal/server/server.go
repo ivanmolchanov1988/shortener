@@ -119,11 +119,13 @@ func getFlags() FlagsConfig {
 }
 
 func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
+	fmt.Println("Initializing configuration and preparing storage...")
 	cfg, err := InitConfig()
 	if err != nil {
 		log.Printf("Config is failed: %v\n", err)
 		return nil, nil, fmt.Errorf("config initialization failed: %w", err)
 	}
+	fmt.Printf("Loaded configuration: %+v\n", cfg)
 	if cfg == nil {
 		log.Println("Config is nil")
 	}
@@ -152,7 +154,8 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 			// }
 			// log.Println("Storage initialized with Postgre")
 		case cfg.FileStoragePath != "":
-			store, err = filestore.NewFileStorage(cfg.FileStoragePath)
+			//store, err = filestore.NewFileStorage(cfg.FileStoragePath)
+			store, err = initializeFileStorage(cfg.FileStoragePath)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
 			}
@@ -275,7 +278,11 @@ func initializeDatabase(dbDSN string) (*sql.DB, error) {
 }
 
 func initializeFileStorage(filePath string) (*filestore.FileStorage, error) {
-	if err := CreateDirectories(filePath); err != nil {
+	fmt.Printf("Starting to initialize file storage at %s\n", filePath)
+
+	dirPath := filepath.Dir(filePath)
+	if err := CreateDirectories(dirPath); err != nil {
+		fmt.Printf("Failed to create directories for path %s: %v\n", dirPath, err)
 		return nil, err
 	}
 
@@ -301,7 +308,7 @@ func InitConfig() (*Config, error) {
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
-	// Логирование для отладки (можете убрать после проверки)
+	// Логирование для отладки
 	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\n",
 		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn)
 	///
@@ -325,6 +332,11 @@ func CreateDirectories(filePath string) error {
 		if err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
+		fmt.Printf("Directory created: %v\n", dir)
+	} else if err != nil {
+		return fmt.Errorf("error checking directory: %w", err)
+	} else {
+		fmt.Printf("Directory already exists: %v\n", dir)
 	}
 	return nil
 }
@@ -340,6 +352,8 @@ func CreateFileIfNotExist(filePath string) error {
 		file.Close()
 	} else if err != nil {
 		return fmt.Errorf("error checking file: %w", err)
+	} else {
+		fmt.Printf("File already exists: %v\n", filePath)
 	}
 	return nil
 }
