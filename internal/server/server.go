@@ -74,7 +74,7 @@ func getFlags() FlagsConfig {
 		baseDSN.host, baseDSN.port, baseDSN.user, baseDSN.password, baseDSN.dbname, baseDSN.sslmode)
 	tempDB := flag.String("d", dsn4flag, "Postgre DSN")
 	//OR
-	//tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	///tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 
 	flag.Parse()
 
