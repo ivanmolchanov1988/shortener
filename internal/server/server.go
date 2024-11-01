@@ -379,6 +379,7 @@ func getShortRoot() string {
 	index := strings.Index(fullRoot, "/cmd/shortener")
 	if index == -1 {
 		fmt.Println("Failed to find ShortRoot")
+		return fullRoot
 	}
 	return fullRoot[:index]
 }
