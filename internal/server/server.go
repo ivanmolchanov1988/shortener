@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -70,11 +71,11 @@ func getFlags() FlagsConfig {
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
 	//db
-	dsn4flag := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		baseDSN.host, baseDSN.port, baseDSN.user, baseDSN.password, baseDSN.dbname, baseDSN.sslmode)
-	tempDB := flag.String("d", dsn4flag, "Postgre DSN")
+	// dsn4flag := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+	// 	baseDSN.host, baseDSN.port, baseDSN.user, baseDSN.password, baseDSN.dbname, baseDSN.sslmode)
+	//tempDB := flag.String("d", dsn4flag, "Postgre DSN")
 	//OR
-	///tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 
 	flag.Parse()
 
@@ -135,13 +136,21 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 		case cfg.DatabaseDsn != "":
 			db, err := initializeDatabase(cfg.DatabaseDsn)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to initialize database: %w", err)
+				log.Printf("Database initialization failed, switching to memory storage: %v", err)
+				store = memory.NewMemoryStorage()
+				//return nil, nil, fmt.Errorf("failed to initialize database: %w", err)
+			} else {
+				store, err = postgr.NewPostgresStorage(db)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+				}
+				log.Println("Storage initialized with Postgre")
 			}
-			store, err = postgr.NewPostgresStorage(db)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
-			}
-			log.Println("Storage initialized with Postgre")
+			// store, err = postgr.NewPostgresStorage(db)
+			// if err != nil {
+			// 	return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+			// }
+			// log.Println("Storage initialized with Postgre")
 		case cfg.FileStoragePath != "":
 			store, err = filestore.NewFileStorage(cfg.FileStoragePath)
 			if err != nil {
@@ -172,12 +181,68 @@ func creteDBconnection(dbDSN string) (*sql.DB, error) {
 
 }
 
+// Для автотестов Яндекса
+func copyMigrations(srcDir, dstDir string) error {
+	files, err := os.ReadDir(srcDir)
+	if err != nil {
+		return fmt.Errorf("failed to read source migrations directory: %v", err)
+	}
+	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
+		err = os.MkdirAll(dstDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create destination migrations directory: %v", err)
+		}
+	}
+	for _, file := range files {
+		srcFilePath := filepath.Join(srcDir, file.Name())
+		dstFilePath := filepath.Join(dstDir, file.Name())
+
+		srcFile, err := os.Open(srcFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to open source file: %v", err)
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(dstFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to create destination file: %v", err)
+		}
+		defer dstFile.Close()
+
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return fmt.Errorf("failed to copy file: %v", err)
+		}
+	}
+	return nil
+}
+
 // func initializeDatabase(db *sql.DB) error {
 func initializeDatabase(dbDSN string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbDSN)
 	if db == nil || err != nil {
 		return nil, errors.New("db connection is nil or return erro")
 	}
+
+	// ----- Для автотестов
+	// Определение исходного и целевого путей для миграций
+	srcMigrationsPath := filepath.Join(getProjectRoot(), "internal/migrations")
+
+	// Определяем директорию запуска тестов
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %v", err)
+	}
+	dstMigrationsPath := filepath.Join(currentDir, "internal/migrations")
+
+	// Копируем миграции в нужную директорию, если они там отсутствуют
+	if _, err := os.Stat(dstMigrationsPath); os.IsNotExist(err) {
+		if err := copyMigrations(srcMigrationsPath, dstMigrationsPath); err != nil {
+			return nil, fmt.Errorf("failed to copy migrations: %v", err)
+		}
+	}
+	fmt.Printf("root project migrations folder: %v\n", srcMigrationsPath)
+	fmt.Printf("dst migrations folder: %v\n", dstMigrationsPath)
+	// -----
 
 	// миграции
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
@@ -193,7 +258,8 @@ func initializeDatabase(dbDSN string) (*sql.DB, error) {
 		log.Printf("found migration file: %s", file.Name())
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://"+rootPath+"/internal/migrations",
+		//"file://"+rootPath+"/internal/migrations",
+		"file://"+dstMigrationsPath, // - ДЛЯ ЯНДЕКСА
 		baseDSN.dbname,
 		driver)
 	if err != nil {
