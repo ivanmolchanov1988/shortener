@@ -2,6 +2,7 @@ package filestore
 
 import (
 	"bufio"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -114,4 +115,14 @@ func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {
 
 	f.shortLinkData = data
 	return data, nil
+}
+
+// PASS для БД BeginTransaction
+func (f *FileStorage) BeginTransaction() (*sql.Tx, error) {
+	return nil, errors.New("transaction is not in FileStorage")
+}
+
+// PASS для БД SaveURLTx
+func (f *FileStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) error {
+	return f.SaveURL(id, shortURL, originalURL)
 }

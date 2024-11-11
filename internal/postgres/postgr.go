@@ -10,6 +10,31 @@ type PostgresStorage struct {
 	db *sql.DB
 }
 
+// Для транзакций 1
+func (p *PostgresStorage) BeginTransaction() (*sql.Tx, error) {
+	if p.db == nil {
+		return nil, errors.New("database connection is nil")
+	}
+	tx, err := p.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+// Для транзакций 2
+func (p *PostgresStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) error {
+	if tx == nil {
+		return errors.New("transaction is nil")
+	}
+	query := `INSERT INTO urls (id, short_url, original_url) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`
+	_, err := tx.Exec(query, id, shortURL, originalURL)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 	storage := &PostgresStorage{db: db}
 	// Проверяем наличие таблицы

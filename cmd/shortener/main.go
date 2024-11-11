@@ -64,6 +64,7 @@ func setupHandlers(store storage.Storage, cfg *server.Config) http.Handler {
 	r.Post("/api/shorten", handler.Shorten)
 	r.Get("/{id}", handler.GetURL)
 	r.Get("/ping", handler.GetPingDB)
+	r.Post("/api/shorten/batch", handler.Batch)
 
 	return r
 }

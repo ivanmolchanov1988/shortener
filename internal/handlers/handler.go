@@ -111,6 +111,91 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 
 }
 
+// ///////// POST BATCH ////////
+func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
+	// Проверка Content-Type
+	if req.Header.Get("Content-Type") != "application/json" {
+		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	// Структура для входящего запроса
+	var requestData []struct {
+		CorrelationID string `json:"correlation_id"`
+		OriginalURL   string `json:"original_url"`
+	}
+	// ... исходящего
+	var responseData []struct {
+		CorrelationID string `json:"correlation_id"`
+		ShortURL      string `json:"short_url"`
+	}
+
+	// Декодер JSON
+	err := json.NewDecoder(req.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(res, "Error decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	// Открываем транзакцию для записи
+	tx, err := h.storage.BeginTransaction()
+	if err != nil {
+		http.Error(res, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	for _, item := range requestData {
+		// Валидируем URL
+		_, err := url.ParseRequestURI(item.OriginalURL)
+		if err != nil {
+			http.Error(res, fmt.Sprintf("Invalid URL: %s", item.OriginalURL), http.StatusBadRequest)
+			return
+		}
+
+		// Генерируем уникальную короткую ссылку
+		shortURL, err := utils.RandStr(8)
+		if err != nil {
+			http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
+			return
+		}
+
+		// Сохраняем URL в рамках транзакции
+		id := utils.GenUUID()
+		err = h.storage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
+		if err != nil {
+			http.Error(res, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		// Заполняем ответ
+		responseData = append(responseData, struct {
+			CorrelationID string `json:"correlation_id"`
+			ShortURL      string `json:"short_url"`
+		}{
+			CorrelationID: item.CorrelationID,
+			ShortURL:      fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
+		})
+	}
+
+	// Завершаем транзакцию
+	if err := tx.Commit(); err != nil {
+		http.Error(res, "Failed to commit transaction", http.StatusInternalServerError)
+		return
+	}
+
+	// Устанавливаем Content-Type и код состояния
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
+
+	// Кодируем и отправляем JSON ответ
+	err = json.NewEncoder(res).Encode(responseData)
+	if err != nil {
+		http.Error(res, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
+}
+
 // //////// SHORTEN //////////
 func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 	// Content-Type - application/json

@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"database/sql"
 	"errors"
 	"sync"
 
@@ -36,6 +37,16 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 		return "", errors.New("URL not found")
 	}
 	return originalURL, nil
+}
+
+// PASS для БД BeginTransaction
+func (m *MemoryStorage) BeginTransaction() (*sql.Tx, error) {
+	return nil, errors.New("transaction is not in MemoryStorage")
+}
+
+// PASS для БД SaveURLTx
+func (m *MemoryStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) error {
+	return m.SaveURL(id, shortURL, originalURL)
 }
 
 var _ storage.Storage = (*MemoryStorage)(nil)
