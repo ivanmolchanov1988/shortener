@@ -38,9 +38,16 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 	return fs, nil
 }
 
-func (f *FileStorage) SaveURL(id, shortURL, originalURL string) error {
+func (f *FileStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	// Cуществует такой originalURL?
+	for _, data := range f.shortLinkData {
+		if data.OriginalURL == originalURL {
+			return data.ShortURL, storage.ErrURLAlreadyExists
+		}
+	}
 
 	newShortLinkData := ShortLinkData{
 		UUID:        id,
@@ -51,17 +58,17 @@ func (f *FileStorage) SaveURL(id, shortURL, originalURL string) error {
 	// Файл уже есть. Проверка в main.
 	file, err := os.OpenFile(f.filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	if err := encoder.Encode(newShortLinkData); err != nil {
-		return err
+		return "", err
 	}
 	f.shortLinkData = append(f.shortLinkData, newShortLinkData)
 
-	return nil
+	return shortURL, nil
 }
 
 func (f *FileStorage) GetURL(shortURL string) (string, error) {
@@ -123,6 +130,6 @@ func (f *FileStorage) BeginTransaction() (*sql.Tx, error) {
 }
 
 // PASS для БД SaveURLTx
-func (f *FileStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) error {
+func (f *FileStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) (string, error) {
 	return f.SaveURL(id, shortURL, originalURL)
 }

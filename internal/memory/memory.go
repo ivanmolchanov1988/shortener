@@ -21,11 +21,20 @@ func NewMemoryStorage() *MemoryStorage {
 	}
 }
 
-func (m *MemoryStorage) SaveURL(id, shortURL, originalURL string) error {
+func (m *MemoryStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Cуществует уже такой originalURL?
+	for existingShortURL, existingOriginalURL := range m.data {
+		if existingOriginalURL == originalURL {
+			// Возвращаем существующий shortURL и ошибку
+			return existingShortURL, storage.ErrURLAlreadyExists
+		}
+	}
+
 	m.data[shortURL] = originalURL
-	return nil
+	return shortURL, nil
 }
 
 func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
@@ -45,7 +54,7 @@ func (m *MemoryStorage) BeginTransaction() (*sql.Tx, error) {
 }
 
 // PASS для БД SaveURLTx
-func (m *MemoryStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) error {
+func (m *MemoryStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) (string, error) {
 	return m.SaveURL(id, shortURL, originalURL)
 }
 

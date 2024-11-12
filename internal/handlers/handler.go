@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,14 +16,6 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
-
-// interfaces
-// type Storage interface {
-// 	SaveURL(shortURL, originalURL string) error
-// 	GetURL(shortURL string) (string, error)
-// }
-
-//var _ storage.Storage = (*Storage)(nil)
 
 type Handler struct {
 	storage storage.Storage
@@ -91,10 +84,17 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Сохраним URL
-	//h.storage.SaveURL(shortURL, urlStr)
 	id := utils.GenUUID()
-	err = h.storage.SaveURL(id, shortURL, urlStr)
+	existingShortURL, err := h.storage.SaveURL(id, shortURL, urlStr)
 	if err != nil {
+		if errors.Is(err, storage.ErrURLAlreadyExists) {
+			// Возвращаем HTTP 409 Conflict и существующий shortURL
+			res.Header().Set("Content-Type", "text/plain")
+			res.WriteHeader(http.StatusConflict)
+			fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL)
+			res.Write([]byte(fullShortURL))
+			return
+		}
 		log.Printf("Failed to save URL: %v", err)
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
 		return
@@ -162,7 +162,7 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 
 		// Сохраняем URL в рамках транзакции
 		id := utils.GenUUID()
-		err = h.storage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
+		_, err = h.storage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
 		if err != nil {
 			http.Error(res, "Error saving URL", http.StatusInternalServerError)
 			return
@@ -230,14 +230,34 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	id := utils.GenUUID()
-
 	// Сохраняем URL
-	err = h.storage.SaveURL(id, shortURL, requestData.URL)
+	id := utils.GenUUID()
+	existingShortURL, err := h.storage.SaveURL(id, shortURL, requestData.URL)
 	if err != nil {
+		if errors.Is(err, storage.ErrURLAlreadyExists) {
+			// Возвращаем HTTP 409 Conflict и уже существующий shortURL
+			res.Header().Set("Content-Type", "application/json")
+			res.WriteHeader(http.StatusConflict)
+			responseData := struct {
+				Result string `json:"result"`
+			}{
+				Result: fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL),
+			}
+			err = json.NewEncoder(res).Encode(responseData)
+			if err != nil {
+				http.Error(res, "Error encoding response", http.StatusInternalServerError)
+			}
+			return
+		}
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
+
+	// err = h.storage.SaveURL(id, shortURL, requestData.URL)
+	// if err != nil {
+	// 	http.Error(res, "Error saving URL", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// Структуру ответа
 	responseData := struct {
