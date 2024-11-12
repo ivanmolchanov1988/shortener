@@ -4,8 +4,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,91 +184,34 @@ func creteDBconnection(dbDSN string) (*sql.DB, error) {
 
 }
 
-// Для автотестов Яндекса
-func copyMigrations(srcDir, dstDir string) error {
-	files, err := os.ReadDir(srcDir)
-	if err != nil {
-		return fmt.Errorf("failed to read source migrations directory: %v", err)
-	}
-	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create destination migrations directory: %v", err)
-		}
-	}
-	for _, file := range files {
-		srcFilePath := filepath.Join(srcDir, file.Name())
-		dstFilePath := filepath.Join(dstDir, file.Name())
-
-		srcFile, err := os.Open(srcFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to open source file: %v", err)
-		}
-		defer srcFile.Close()
-
-		dstFile, err := os.Create(dstFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to create destination file: %v", err)
-		}
-		defer dstFile.Close()
-
-		if _, err := io.Copy(dstFile, srcFile); err != nil {
-			return fmt.Errorf("failed to copy file: %v", err)
-		}
-	}
-	return nil
-}
-
-// func initializeDatabase(db *sql.DB) error {
 func initializeDatabase(dbDSN string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbDSN)
 	if db == nil || err != nil {
 		return nil, errors.New("db connection is nil or return erro")
 	}
 
-	// ----- Для автотестов
-	// Определение исходного и целевого путей для миграций
-	srcMigrationsPath := filepath.Join(getProjectRoot(), "internal/migrations")
-
-	// Определяем директорию запуска тестов
-	currentDir, err := os.Getwd()
+	// Что тут за БД?
+	dbName, err := getDBNameFromDSN(dbDSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %v", err)
+		return nil, fmt.Errorf("failed to get database name from DSN: %v", err)
 	}
-	dstMigrationsPath := filepath.Join(currentDir, "internal/migrations")
 
-	// Копируем миграции в нужную директорию, если они там отсутствуют
-	if _, err := os.Stat(dstMigrationsPath); os.IsNotExist(err) {
-		if err := copyMigrations(srcMigrationsPath, dstMigrationsPath); err != nil {
-			return nil, fmt.Errorf("failed to copy migrations: %v", err)
-		}
-	}
-	fmt.Printf("root project migrations folder: %v\n", srcMigrationsPath)
-	fmt.Printf("dst migrations folder: %v\n", dstMigrationsPath)
-	// -----
-
-	// миграции
+	// ----- Для автотестов
+	// ----- 2 ----- для iter11
+	migrationsPath := "file://./migrations"
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create migrate: %v", err)
+		return nil, fmt.Errorf("failed to create migration driver: %v", err)
 	}
-	rootPath := getShortRoot()
-	files, err := os.ReadDir(rootPath + "/internal/migrations")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read migrations directory: %v", err)
-	}
-	for _, file := range files {
-		log.Printf("found migration file: %s", file.Name())
-	}
+
 	m, err := migrate.NewWithDatabaseInstance(
-		//"file://"+rootPath+"/internal/migrations",
-		"file://"+dstMigrationsPath, // - ДЛЯ ЯНДЕКСА
-		baseDSN.dbname,
+		migrationsPath,
+		dbName,
 		driver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize migrate: %v", err)
 	}
-	//запуск миграции
+
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return nil, fmt.Errorf("failed to apply migrate: %v", err)
 	}
@@ -374,12 +317,16 @@ func getDefaultFilePath() string {
 	newPath := filepath.Join(projectRoot, "urls.json")
 	return newPath
 }
-func getShortRoot() string {
-	var fullRoot = getProjectRoot()
-	index := strings.Index(fullRoot, "/cmd/shortener")
-	if index == -1 {
-		fmt.Println("Failed to find ShortRoot")
-		return fullRoot
+
+// Видимо другое имя БД в ЯНДЕКСЕ. Надо динамически достать из DSN
+func getDBNameFromDSN(dsn string) (string, error) {
+	parsedURL, err := url.Parse(dsn)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse DSN: %w", err)
 	}
-	return fullRoot[:index]
+	dbName := strings.TrimPrefix(parsedURL.Path, "/")
+	if dbName == "" {
+		return "", fmt.Errorf("database name not found in DSN")
+	}
+	return dbName, nil
 }

@@ -4,9 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
+	"log"
 
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
@@ -37,18 +35,16 @@ func (p *PostgresStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string
     RETURNING short_url;`
 	err := tx.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
 	if err != nil {
-		// Ошибка - конфликт уникальности?
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			// Получаем short_url для original_url
-			existingShortURL, getErr := p.GetShortURLByOriginalURLTx(tx, originalURL)
-			if getErr != nil {
-				return "", fmt.Errorf("failed to get existing short URL: %w", getErr)
-			}
-			return existingShortURL, storage.ErrURLAlreadyExists
-		}
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
+
+	// Конфликт?
+	if existingShortURL != shortURL {
+		// URL уже существует, возвращаем существующий shortURL и ошибку
+		//return existingShortURL, ErrURLAlreadyExists
+		return existingShortURL, storage.ErrURLAlreadyExists
+	}
+
 	return existingShortURL, nil
 }
 
@@ -78,7 +74,7 @@ func (p *PostgresStorage) createTable() error {
 	query := `
     CREATE TABLE IF NOT EXISTS urls (
         id UUID PRIMARY KEY,
-        short_url TEXT UNIQUE NOT NULL,
+        short_url TEXT NOT NULL,
         original_url TEXT UNIQUE NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -90,28 +86,29 @@ func (p *PostgresStorage) createTable() error {
 	return nil
 }
 
-var ErrURLAlreadyExists = errors.New("URL already exists")
+//var ErrURLAlreadyExists = errors.New("URL already exists")
 
 func (p *PostgresStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
+	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s", id, shortURL, originalURL)
 	var existingShortURL string
 	query := `
     INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
     VALUES ($1, $2, $3, DEFAULT, DEFAULT)
-    ON CONFLICT (original_url) DO UPDATE 
+    ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
     RETURNING short_url;`
 	err := p.db.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
 	if err != nil {
-		// Была ошибка ошибкой уникальности?
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			existingShortURL, getErr := p.GetShortURLByOriginalURL(originalURL)
-			if getErr != nil {
-				return "", fmt.Errorf("failed to get existing shortURL: %w", getErr)
-			}
-			return existingShortURL, ErrURLAlreadyExists
-		}
+		log.Printf("Failed to save URL: %v", err)
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
+
+	// Конфликт?
+	if existingShortURL != shortURL {
+		// URL уже существует, возвращаем существующий shortURL и ошибку
+		return existingShortURL, storage.ErrURLAlreadyExists
+	}
+
+	log.Printf("URL saved successfully: %s", existingShortURL)
 	return existingShortURL, nil
 }
 
