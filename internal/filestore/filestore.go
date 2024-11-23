@@ -3,10 +3,11 @@ package filestore
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 	"sync"
 
-	"github.com/ivanmolchanov1988/shortener/pkg/utils"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
 type ShortLinkData struct {
@@ -21,20 +22,34 @@ type FileStorage struct {
 	mu            sync.RWMutex
 }
 
-func NewFileStorage(filePath string) *FileStorage {
-	return &FileStorage{
+var _ storage.Storage = (*FileStorage)(nil)
+
+func NewFileStorage(filePath string) (*FileStorage, error) {
+	fs := &FileStorage{
 		filePath:      filePath,
 		shortLinkData: []ShortLinkData{},
 	}
+
+	if _, err := fs.LoadDataFromFile(); err != nil {
+		return nil, err
+	}
+
+	return fs, nil
 }
 
-func (f *FileStorage) SaveURL(shortURL, originalURL string) error {
+func (f *FileStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	uuid := utils.GenUUID()
+	// Cуществует такой originalURL?
+	for _, data := range f.shortLinkData {
+		if data.OriginalURL == originalURL {
+			return data.ShortURL, storage.ErrURLAlreadyExists
+		}
+	}
+
 	newShortLinkData := ShortLinkData{
-		UUID:        uuid,
+		UUID:        id,
 		ShortURL:    shortURL,
 		OriginalURL: originalURL,
 	}
@@ -42,16 +57,30 @@ func (f *FileStorage) SaveURL(shortURL, originalURL string) error {
 	// Файл уже есть. Проверка в main.
 	file, err := os.OpenFile(f.filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	if err := encoder.Encode(newShortLinkData); err != nil {
-		return err
+		return "", err
+	}
+	f.shortLinkData = append(f.shortLinkData, newShortLinkData)
+
+	return shortURL, nil
+}
+
+func (f *FileStorage) GetURL(shortURL string) (string, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	for _, data := range f.shortLinkData {
+		if data.ShortURL == shortURL {
+			return data.OriginalURL, nil
+		}
 	}
 
-	return nil
+	return "", errors.New("URL not found")
 }
 
 func (f *FileStorage) saveData(data []ShortLinkData) error {
@@ -66,6 +95,9 @@ func (f *FileStorage) saveData(data []ShortLinkData) error {
 }
 
 func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	file, err := os.Open(f.filePath)
 	if err != nil {
 		return nil, err
@@ -87,5 +119,16 @@ func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {
 		return nil, err
 	}
 
+	f.shortLinkData = data
 	return data, nil
+}
+
+// PASS для БД BeginTransaction
+func (f *FileStorage) BeginTransaction() (storage.TransactionStorage, error) {
+	return nil, errors.New("transaction is not in FileStorage")
+}
+
+// PASS для БД SaveURLTx
+func (f *FileStorage) SaveURLTx(id, shortURL, originalURL string) (string, error) {
+	return f.SaveURL(id, shortURL, originalURL)
 }
