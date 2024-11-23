@@ -18,8 +18,9 @@ import (
 )
 
 type Handler struct {
-	storage storage.Storage
-	config  *server.Config
+	storage   storage.Storage
+	txStorage storage.TransactionStorage
+	config    *server.Config
 }
 
 func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
@@ -162,7 +163,8 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 
 		// Сохраняем URL в рамках транзакции
 		id := utils.GenUUID()
-		_, err = h.storage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
+		//_, err = h.txStorage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
+		_, err = tx.SaveURLTx(id, shortURL, item.OriginalURL)
 		if err != nil {
 			http.Error(res, "Error saving URL", http.StatusInternalServerError)
 			return

@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"database/sql"
 	"errors"
 	"sync"
 
@@ -20,6 +19,9 @@ func NewMemoryStorage() *MemoryStorage {
 		data: make(map[string]string),
 	}
 }
+
+// PASS transaction
+type MemoryTransaction struct{}
 
 func (m *MemoryStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
 	m.mu.Lock()
@@ -49,13 +51,24 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 }
 
 // PASS для БД BeginTransaction
-func (m *MemoryStorage) BeginTransaction() (*sql.Tx, error) {
+func (m *MemoryStorage) BeginTransaction() (storage.TransactionStorage, error) {
 	return nil, errors.New("transaction is not in MemoryStorage")
 }
 
 // PASS для БД SaveURLTx
-func (m *MemoryStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) (string, error) {
-	return m.SaveURL(id, shortURL, originalURL)
+func (m *MemoryStorage) SaveURLTx(id, shortURL, originalURL string) (string, error) {
+	//return m.SaveURL(id, shortURL, originalURL)
+	return "", errors.New("transactions are not supported in MemoryStorage")
+}
+
+// PASS Commit
+func (m *MemoryTransaction) Commit() error {
+	return errors.New("transactions are not supported in MemoryStorage")
+}
+
+// PASS Rollback
+func (m *MemoryTransaction) Rollback() error {
+	return errors.New("transactions are not supported in MemoryStorage")
 }
 
 var _ storage.Storage = (*MemoryStorage)(nil)

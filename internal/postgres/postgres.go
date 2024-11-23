@@ -1,4 +1,4 @@
-package postgr
+package postgres
 
 import (
 	"database/sql"
@@ -10,11 +10,18 @@ import (
 )
 
 type PostgresStorage struct {
-	db *sql.DB
+	db           *sql.DB
+	insertStmt   *sql.Stmt
+	selectStmt   *sql.Stmt
+	selectByOrig *sql.Stmt
+}
+
+type PostgresTransaction struct {
+	tx *sql.Tx
 }
 
 // Для транзакций 1
-func (p *PostgresStorage) BeginTransaction() (*sql.Tx, error) {
+func (p *PostgresStorage) BeginTransaction() (storage.TransactionStorage, error) {
 	if p.db == nil {
 		return nil, errors.New("database connection is nil")
 	}
@@ -22,18 +29,18 @@ func (p *PostgresStorage) BeginTransaction() (*sql.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tx, nil
+	return &PostgresTransaction{tx: tx}, nil
 }
 
 // Для транзакций 2
-func (p *PostgresStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) (string, error) {
+func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL string) (string, error) {
 	var existingShortURL string
 	query := `
     INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
     VALUES ($1, $2, $3, DEFAULT, DEFAULT)
     ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
     RETURNING short_url;`
-	err := tx.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
+	err := t.tx.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
@@ -46,6 +53,16 @@ func (p *PostgresStorage) SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string
 	}
 
 	return existingShortURL, nil
+}
+
+// Commit завершает транзакцию
+func (t *PostgresTransaction) Commit() error {
+	return t.tx.Commit()
+}
+
+// Rollback откатывает транзакцию
+func (t *PostgresTransaction) Rollback() error {
+	return t.tx.Rollback()
 }
 
 func (p *PostgresStorage) GetShortURLByOriginalURLTx(tx *sql.Tx, originalURL string) (string, error) {
@@ -67,7 +84,38 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 	if err := storage.createTable(); err != nil {
 		return nil, err
 	}
-	return storage, nil
+
+	// INSERT
+	insertStmt, err := db.Prepare(`
+		INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
+		VALUES ($1, $2, $3, DEFAULT, DEFAULT)
+		ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+		RETURNING short_url;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare insert statement: %w", err)
+	}
+
+	// SELECT
+	selectStmt, err := db.Prepare(`
+		SELECT original_url FROM urls WHERE short_url = $1;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %w", err)
+	}
+
+	// SELECT by orig
+	selectByOrig, err := db.Prepare(`
+		SELECT short_url FROM urls WHERE original_url = $1;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select by original statement: %w", err)
+	}
+
+	//return storage, nil
+	return &PostgresStorage{
+		db:           db,
+		insertStmt:   insertStmt,
+		selectStmt:   selectStmt,
+		selectByOrig: selectByOrig,
+	}, nil
 }
 
 func (p *PostgresStorage) createTable() error {
@@ -91,12 +139,7 @@ func (p *PostgresStorage) createTable() error {
 func (p *PostgresStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
 	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s", id, shortURL, originalURL)
 	var existingShortURL string
-	query := `
-    INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
-    VALUES ($1, $2, $3, DEFAULT, DEFAULT)
-    ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-    RETURNING short_url;`
-	err := p.db.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
+	err := p.insertStmt.QueryRow(id, shortURL, originalURL).Scan(&existingShortURL)
 	if err != nil {
 		log.Printf("Failed to save URL: %v", err)
 		return "", fmt.Errorf("failed to save URL: %w", err)
@@ -114,8 +157,7 @@ func (p *PostgresStorage) SaveURL(id, shortURL, originalURL string) (string, err
 
 func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 	var originalURL string
-	query := `SELECT original_url FROM urls WHERE short_url = $1;`
-	err := p.db.QueryRow(query, shortURL).Scan(&originalURL)
+	err := p.selectStmt.QueryRow(shortURL).Scan(&originalURL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", errors.New("URL not found")
@@ -127,11 +169,22 @@ func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 
 func (p *PostgresStorage) GetShortURLByOriginalURL(originalURL string) (string, error) {
 	var shortURL string
-	query := `
-	SELECT short_url FROM urls WHERE original_url = $1;`
-	err := p.db.QueryRow(query, originalURL).Scan(&shortURL)
+	err := p.selectByOrig.QueryRow(originalURL).Scan(&shortURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to get short URL by original URL: %w", err)
 	}
 	return shortURL, nil
+}
+
+func (p *PostgresStorage) Close() error {
+	if err := p.insertStmt.Close(); err != nil {
+		return err
+	}
+	if err := p.selectStmt.Close(); err != nil {
+		return err
+	}
+	if err := p.selectByOrig.Close(); err != nil {
+		return err
+	}
+	return p.db.Close()
 }
