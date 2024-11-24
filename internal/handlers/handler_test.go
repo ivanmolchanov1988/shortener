@@ -255,7 +255,7 @@ func TestGetUrl(t *testing.T) {
 	// }
 	handler := NewHandler(memStore, cfg)
 
-	if _, err := memStore.SaveURL(id, testShortURL, testUserID, "https://testURL123.ru"); err != nil {
+	if _, err := memStore.SaveURL(id, testShortURL, "https://testURL123.ru", testUserID); err != nil {
 		require.NoError(t, err)
 	}
 
