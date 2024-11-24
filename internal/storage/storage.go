@@ -24,6 +24,6 @@ type TransactionStorage interface {
 }
 
 type UserURLS struct {
-	ShortURL    string
-	OriginalURL string
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
