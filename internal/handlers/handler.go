@@ -90,7 +90,7 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 
 	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 	if err != nil {
-		//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -152,7 +152,12 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	//defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 
 	for _, item := range requestData {
 		// Валидируем URL
@@ -174,7 +179,7 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		//_, err = h.txStorage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
 		userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 		if err != nil {
-			//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+			http.Error(res, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -251,7 +256,7 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 
 	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 	if err != nil {
-		//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -337,37 +342,24 @@ func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
-		log.Printf("Error token from cookie: %v", err)
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		//return auth.CreateCookie(w, secret)
 		return "", err
 	}
 
 	userID, err := auth.GetUserID(secret, tokenString)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		//return auth.CreateCookie(w, secret)
 		return "", err
 	}
 
 	return userID, nil
 }
 
-// func CreateCookie(w http.ResponseWriter, secret string, h *Handler) (string, error) {
-// 	userID := utils.GenUUID()
-// 	token, err := auth.BuildJWTString(secret, userID, time.Hour * time.Duration(h.config.TimeToExpire))
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	auth.SetTokenCookie(w, token, time.Hour * time.Duration(h.config.TimeToExpire))
-
-// 	return userID, nil
-// }
-
 // GET USER URLS
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromCookie(w, r, h.config.Secret)
 	if err != nil {
-		//http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
