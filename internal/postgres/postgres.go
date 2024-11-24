@@ -53,6 +53,8 @@ func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL, userID string
 		return existingShortURL, storage.ErrURLAlreadyExists
 	}
 
+	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s, userID=%s", id, shortURL, originalURL, userID)
+
 	return existingShortURL, nil
 }
 
@@ -162,6 +164,8 @@ func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (str
 	}
 
 	log.Printf("URL saved successfully: %s", existingShortURL)
+	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s, userID=%s", id, shortURL, originalURL, userID)
+
 	return existingShortURL, nil
 }
 
@@ -201,6 +205,7 @@ func (p *PostgresStorage) Close() error {
 
 // Для списка URLs пользователя
 func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
+	log.Printf("URLs for userID: %s", userID)
 	rows, err := p.selectUrlsFromUserID.Query(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)

@@ -337,6 +337,7 @@ func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
+		log.Printf("Error fetching token from cookie: %v", err)
 		return auth.CreateCookie(w, secret)
 	}
 
