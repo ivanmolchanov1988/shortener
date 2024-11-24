@@ -337,13 +337,15 @@ func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
-		log.Printf("Error fetching token from cookie: %v", err)
-		return auth.CreateCookie(w, secret)
+		log.Printf("Error token from cookie: %v", err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return "", err
 	}
 
 	userID, err := auth.GetUserID(secret, tokenString)
 	if err != nil {
-		return auth.CreateCookie(w, secret)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return "", err
 	}
 
 	return userID, nil
@@ -383,6 +385,7 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(urls); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
 	}
 	//json.NewEncoder(w).Encode(urls)
 }
