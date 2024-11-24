@@ -90,7 +90,7 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 
 	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 	if err != nil {
-		http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		//_, err = h.txStorage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
 		userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 		if err != nil {
-			http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+			//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
 			return
 		}
 
@@ -251,7 +251,7 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 
 	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 	if err != nil {
-		http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		//http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
 		return
 	}
 
@@ -338,13 +338,13 @@ func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) 
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
 		log.Printf("Error token from cookie: %v", err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return "", err
 	}
 
 	userID, err := auth.GetUserID(secret, tokenString)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return "", err
 	}
 
@@ -367,7 +367,7 @@ func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) 
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromCookie(w, r, h.config.Secret)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		//http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
