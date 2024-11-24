@@ -90,7 +90,9 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 
 	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
 	if err != nil {
-		http.Error(res, "Unauthorized", http.StatusUnauthorized)
+		//http.Error(res, "Unauthorized", http.StatusUnauthorized)
+		log.Printf("Error fetching user ID: %v", err)
+		http.Error(res, "Error fetching user ID", http.StatusInternalServerError)
 		return
 	}
 
@@ -342,14 +344,14 @@ func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
-		//return auth.CreateCookie(w, secret)
-		return "", err
+		return auth.CreateCookie(w, secret)
+		//return "", err
 	}
 
 	userID, err := auth.GetUserID(secret, tokenString)
 	if err != nil {
-		//return auth.CreateCookie(w, secret)
-		return "", err
+		return auth.CreateCookie(w, secret)
+		//return "", err
 	}
 
 	return userID, nil
