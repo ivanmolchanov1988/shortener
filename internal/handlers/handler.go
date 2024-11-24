@@ -382,6 +382,11 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FUUUU!
+	for i := range urls {
+		urls[i].ShortURL = fmt.Sprintf("%s/%s", h.config.BaseURL, urls[i].ShortURL)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(urls); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
