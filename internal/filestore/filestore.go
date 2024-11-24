@@ -14,6 +14,7 @@ type ShortLinkData struct {
 	UUID        string `json:"id"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
 }
 
 type FileStorage struct {
@@ -37,7 +38,7 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 	return fs, nil
 }
 
-func (f *FileStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
+func (f *FileStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -52,6 +53,7 @@ func (f *FileStorage) SaveURL(id, shortURL, originalURL string) (string, error) 
 		UUID:        id,
 		ShortURL:    shortURL,
 		OriginalURL: originalURL,
+		UserID:      userID,
 	}
 
 	// Файл уже есть. Проверка в main.
@@ -129,6 +131,11 @@ func (f *FileStorage) BeginTransaction() (storage.TransactionStorage, error) {
 }
 
 // PASS для БД SaveURLTx
-func (f *FileStorage) SaveURLTx(id, shortURL, originalURL string) (string, error) {
-	return f.SaveURL(id, shortURL, originalURL)
+func (f *FileStorage) SaveURLTx(id, shortURL, originalURL, userID string) (string, error) {
+	return f.SaveURL(id, shortURL, originalURL, userID)
+}
+
+// PASS для URLs для user
+func (f *FileStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
+	return nil, errors.New("get URLs for user is not in FileStorage")
 }

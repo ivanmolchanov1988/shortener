@@ -30,6 +30,9 @@ type Config struct {
 	FileStoragePath string
 	//db
 	DatabaseDsn string
+	//user id
+	Secret       string
+	TimeToExpire int
 }
 
 type FlagsConfig struct {
@@ -319,7 +322,9 @@ func InitConfig() (*Config, error) {
 		Logging:         flags.Logging,
 		FileStoragePath: flags.FilePath,
 		//db
-		DatabaseDsn: flags.DatabaseDsn,
+		DatabaseDsn:  flags.DatabaseDsn,
+		Secret:       "secret",
+		TimeToExpire: 3,
 	}, nil
 
 }

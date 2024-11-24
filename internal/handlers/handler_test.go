@@ -243,6 +243,7 @@ func TestGetUrl(t *testing.T) {
 	testShortURL := "testURL"
 	invalidShortURL := "123321"
 	id := "Qwerty"
+	testUserID := "123333"
 
 	// fStore, err := filestore.NewFileStorage(cfg.FileStoragePath)
 	// if err != nil {
@@ -254,7 +255,7 @@ func TestGetUrl(t *testing.T) {
 	// }
 	handler := NewHandler(memStore, cfg)
 
-	if _, err := memStore.SaveURL(id, testShortURL, "https://testURL123.ru"); err != nil {
+	if _, err := memStore.SaveURL(id, testShortURL, testUserID, "https://testURL123.ru"); err != nil {
 		require.NoError(t, err)
 	}
 

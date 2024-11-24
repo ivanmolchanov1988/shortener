@@ -23,7 +23,7 @@ func NewMemoryStorage() *MemoryStorage {
 // PASS transaction
 type MemoryTransaction struct{}
 
-func (m *MemoryStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
+func (m *MemoryStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -69,6 +69,10 @@ func (m *MemoryTransaction) Commit() error {
 // PASS Rollback
 func (m *MemoryTransaction) Rollback() error {
 	return errors.New("transactions are not supported in MemoryStorage")
+}
+
+func (m *MemoryStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
+	return nil, errors.New("get URLs for user are not supported in MemoryStorage")
 }
 
 var _ storage.Storage = (*MemoryStorage)(nil)

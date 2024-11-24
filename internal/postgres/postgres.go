@@ -10,10 +10,11 @@ import (
 )
 
 type PostgresStorage struct {
-	db           *sql.DB
-	insertStmt   *sql.Stmt
-	selectStmt   *sql.Stmt
-	selectByOrig *sql.Stmt
+	db                   *sql.DB
+	insertStmt           *sql.Stmt
+	selectStmt           *sql.Stmt
+	selectByOrig         *sql.Stmt
+	selectUrlsFromUserID *sql.Stmt
 }
 
 type PostgresTransaction struct {
@@ -33,14 +34,14 @@ func (p *PostgresStorage) BeginTransaction() (storage.TransactionStorage, error)
 }
 
 // Для транзакций 2
-func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL string) (string, error) {
+func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL, userID string) (string, error) {
 	var existingShortURL string
 	query := `
-    INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
-    VALUES ($1, $2, $3, DEFAULT, DEFAULT)
+    INSERT INTO urls (id, short_url, original_url, user_id, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, DEFAULT, DEFAULT)
     ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
     RETURNING short_url;`
-	err := t.tx.QueryRow(query, id, shortURL, originalURL).Scan(&existingShortURL)
+	err := t.tx.QueryRow(query, id, shortURL, originalURL, userID).Scan(&existingShortURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
@@ -87,8 +88,8 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 
 	// INSERT
 	insertStmt, err := db.Prepare(`
-		INSERT INTO urls (id, short_url, original_url, created_at, updated_at)
-		VALUES ($1, $2, $3, DEFAULT, DEFAULT)
+		INSERT INTO urls (id, short_url, original_url, user_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, DEFAULT, DEFAULT)
 		ON CONFLICT (original_url) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
 		RETURNING short_url;`)
 	if err != nil {
@@ -102,6 +103,13 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 		return nil, fmt.Errorf("failed to prepare select statement: %w", err)
 	}
 
+	// SELECT URLs FROM USER ID
+	selectUrlsFromUserID, err := db.Prepare(`
+		SELECT short_url, original_url FROM urls WHERE user_id = $1`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select URLs: %w", err)
+	}
+
 	// SELECT by orig
 	selectByOrig, err := db.Prepare(`
 		SELECT short_url FROM urls WHERE original_url = $1;`)
@@ -111,10 +119,11 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 
 	//return storage, nil
 	return &PostgresStorage{
-		db:           db,
-		insertStmt:   insertStmt,
-		selectStmt:   selectStmt,
-		selectByOrig: selectByOrig,
+		db:                   db,
+		insertStmt:           insertStmt,
+		selectStmt:           selectStmt,
+		selectByOrig:         selectByOrig,
+		selectUrlsFromUserID: selectUrlsFromUserID,
 	}, nil
 }
 
@@ -124,6 +133,7 @@ func (p *PostgresStorage) createTable() error {
         id UUID PRIMARY KEY,
         short_url TEXT NOT NULL,
         original_url TEXT UNIQUE NOT NULL,
+		user_id UUID,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
     );`
@@ -136,10 +146,10 @@ func (p *PostgresStorage) createTable() error {
 
 //var ErrURLAlreadyExists = errors.New("URL already exists")
 
-func (p *PostgresStorage) SaveURL(id, shortURL, originalURL string) (string, error) {
-	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s", id, shortURL, originalURL)
+func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
+	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s, userID=%s", id, shortURL, originalURL, userID)
 	var existingShortURL string
-	err := p.insertStmt.QueryRow(id, shortURL, originalURL).Scan(&existingShortURL)
+	err := p.insertStmt.QueryRow(id, shortURL, originalURL, userID).Scan(&existingShortURL)
 	if err != nil {
 		log.Printf("Failed to save URL: %v", err)
 		return "", fmt.Errorf("failed to save URL: %w", err)
@@ -187,4 +197,28 @@ func (p *PostgresStorage) Close() error {
 		return err
 	}
 	return p.db.Close()
+}
+
+// Для списка URLs пользователя
+func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
+	rows, err := p.selectUrlsFromUserID.Query(userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	var usersURLs []storage.UserURLS
+	for rows.Next() {
+		var url storage.UserURLS
+		if err := rows.Scan(&url.ShortURL, &url.OriginalURL); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		usersURLs = append(usersURLs, url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return usersURLs, nil
 }

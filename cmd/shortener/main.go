@@ -7,10 +7,12 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ivanmolchanov1988/shortener/internal/auth"
 	"github.com/ivanmolchanov1988/shortener/internal/compress"
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 
+	//"github.com/ivanmolchanov1988/shortener/internal/auth"
 	"github.com/ivanmolchanov1988/shortener/internal/logger"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 
@@ -25,6 +27,10 @@ func main() {
 	}
 	fmt.Printf("Initialized config: %+v\n", cfg)
 	fmt.Printf("Storage type: %T\n", store)
+
+	// отправим secret
+	auth.GetTimeForExpire(cfg.TimeToExpire)
+
 	// if store == nil {
 	// 	log.Fatalf("CFG is failed: %v\n", store)
 	// }
@@ -65,6 +71,7 @@ func setupHandlers(store storage.Storage, cfg *server.Config) http.Handler {
 	r.Get("/{id}", handler.GetURL)
 	r.Get("/ping", handler.GetPingDB)
 	r.Post("/api/shorten/batch", handler.Batch)
+	r.Get("/api/user/urls", handler.GetUserURLS)
 
 	return r
 }

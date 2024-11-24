@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/internal/auth"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
@@ -86,7 +87,14 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	}
 	// Сохраним URL
 	id := utils.GenUUID()
-	existingShortURL, err := h.storage.SaveURL(id, shortURL, urlStr)
+
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
+	if err != nil {
+		http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		return
+	}
+
+	existingShortURL, err := h.storage.SaveURL(id, shortURL, urlStr, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExists) {
 			// Возвращаем HTTP 409 Conflict и существующий shortURL
@@ -164,7 +172,13 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		// Сохраняем URL в рамках транзакции
 		id := utils.GenUUID()
 		//_, err = h.txStorage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
-		_, err = tx.SaveURLTx(id, shortURL, item.OriginalURL)
+		userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
+		if err != nil {
+			http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+			return
+		}
+
+		_, err = tx.SaveURLTx(id, shortURL, item.OriginalURL, userID)
 		if err != nil {
 			http.Error(res, "Error saving URL", http.StatusInternalServerError)
 			return
@@ -234,7 +248,14 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 
 	// Сохраняем URL
 	id := utils.GenUUID()
-	existingShortURL, err := h.storage.SaveURL(id, shortURL, requestData.URL)
+
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret)
+	if err != nil {
+		http.Error(res, "Failed to get user ID", http.StatusUnauthorized)
+		return
+	}
+
+	existingShortURL, err := h.storage.SaveURL(id, shortURL, requestData.URL, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExists) {
 			// Возвращаем HTTP 409 Conflict и уже существующий shortURL
@@ -310,4 +331,54 @@ func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 
 	res.WriteHeader(http.StatusOK)
 
+}
+
+// UserID From Cookie
+func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string) (string, error) {
+	tokenString, err := auth.GetTokenFromCookie(r)
+	if err != nil {
+		return auth.CreateCookie(w, secret)
+	}
+
+	userID, err := auth.GetUserID(secret, tokenString)
+	if err != nil {
+		return auth.CreateCookie(w, secret)
+	}
+
+	return userID, nil
+}
+
+// func CreateCookie(w http.ResponseWriter, secret string, h *Handler) (string, error) {
+// 	userID := utils.GenUUID()
+// 	token, err := auth.BuildJWTString(secret, userID, time.Hour * time.Duration(h.config.TimeToExpire))
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	auth.SetTokenCookie(w, token, time.Hour * time.Duration(h.config.TimeToExpire))
+
+// 	return userID, nil
+// }
+
+// GET USER URLS
+func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserIDFromCookie(w, r, h.config.Secret)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := h.storage.GetUserURLS(userID)
+	if err != nil {
+		http.Error(w, "Failed to get user URLs", http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(urls)
 }
