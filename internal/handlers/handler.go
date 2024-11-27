@@ -320,7 +320,15 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	// 404, если не найден
 	originURL, err := h.storage.GetURL(idLink)
 	if err != nil {
-		http.Error(res, "URL not found", http.StatusNotFound)
+		if errors.Is(err, storage.ErrURLIsGone) {
+			http.Error(res, "URL is gone", http.StatusGone)
+			return
+		}
+		if errors.Is(err, storage.ErrURLNotFound) {
+			http.Error(res, "URL not found", http.StatusNotFound)
+			return
+		}
+		http.Error(res, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	res.Header().Set("Location", originURL)
@@ -419,11 +427,17 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = h.storage.DeleteURLS(userID, shortURLs4Delete)
-	if err != nil {
-		http.Error(res, "Error deleting URLs", http.StatusInternalServerError)
-		return
-	}
+	go func() {
+		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
+			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
+		}
+	}()
+
+	// err = h.storage.DeleteURLS(userID, shortURLs4Delete)
+	// if err != nil {
+	// 	http.Error(res, "Error deleting URLs", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	res.WriteHeader(http.StatusAccepted)
 }

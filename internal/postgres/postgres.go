@@ -15,6 +15,7 @@ type PostgresStorage struct {
 	db                   *sql.DB
 	insertStmt           *sql.Stmt
 	selectStmt           *sql.Stmt
+	deleteSelectStmt     *sql.Stmt
 	selectByOrig         *sql.Stmt
 	selectUrlsFromUserID *sql.Stmt
 }
@@ -102,10 +103,26 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 
 	// SELECT
 	selectStmt, err := db.Prepare(`
-		SELECT original_url FROM urls WHERE short_url = $1;`)
+		SELECT original_url, delete_flag FROM urls WHERE short_url = $1;`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare select statement: %w", err)
 	}
+
+	// SELECT for DELETE
+	DeleteSelectStmt, err := db.Prepare(`
+		SELECT original_url FROM urls WHERE short_url = $1 AND delete_flag = FALSE;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare select statement: %w", err)
+	}
+
+	// DELETE - пока не надо
+	// deleteStmt, err := db.Prepare(`
+	// 	DELETE FROM urls
+	// 	WHERE delete_flag = TRUE;
+	// `)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to prepare delete statement: %w", err)
+	// }
 
 	// SELECT URLs FROM USER ID
 	selectUrlsFromUserID, err := db.Prepare(`
@@ -126,6 +143,7 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 		db:                   db,
 		insertStmt:           insertStmt,
 		selectStmt:           selectStmt,
+		deleteSelectStmt:     DeleteSelectStmt,
 		selectByOrig:         selectByOrig,
 		selectUrlsFromUserID: selectUrlsFromUserID,
 	}, nil
@@ -174,12 +192,16 @@ func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (str
 
 func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 	var originalURL string
-	err := p.selectStmt.QueryRow(shortURL).Scan(&originalURL)
+	var deleteFlag bool
+	err := p.selectStmt.QueryRow(shortURL).Scan(&originalURL, &deleteFlag)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", errors.New("URL not found")
+			return "", storage.ErrURLNotFound
 		}
 		return "", fmt.Errorf("failed to get URL: %w", err)
+	}
+	if deleteFlag {
+		return "", storage.ErrURLIsGone
 	}
 	return originalURL, nil
 }
@@ -265,7 +287,10 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 	// Обработка пачек
 	var wg sync.WaitGroup
 
-	var errResult error
+	//var errResult error
+	errChan := make(chan error, 1)
+	var once sync.Once
+
 	for batch := range batchChan {
 		wg.Add(1)
 		go func(batch []string) {
@@ -278,9 +303,12 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 			`
 			_, err := p.db.Exec(query, userID, pq.Array(batch))
 			if err != nil {
-				if errResult != nil {
-					errResult = fmt.Errorf("failed to update batch %v: %w", batch, err)
-				}
+				// if errResult != nil {
+				// 	errResult = fmt.Errorf("failed to update batch %v: %w", batch, err)
+				// }
+				once.Do(func() {
+					errChan <- err
+				})
 			} else {
 				log.Printf("Successfully deleted: %v", batch)
 			}
@@ -288,17 +316,22 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 	}
 
 	wg.Wait()
+	close(errChan)
 
-	// УДАЛЯЕМ
-	if err := p.HardDeleteURLs(); err != nil {
-		log.Printf("Failed to hard delete marked URLs: %v", err)
+	if err := <-errChan; err != nil {
+		return fmt.Errorf("failed to delete URLs: %w", err)
 	}
 
-	return errResult
+	// УДАЛЯЕМ
+	// if err := p.HardDeleteURLs(); err != nil {
+	// 	log.Printf("Failed to hard delete marked URLs: %v", err)
+	// }
+
+	return nil
 
 }
 
-// Реальное удаление - плохо, но, вроде, требует Яндекс
+// Реальное удаление - плохо, но, вроде, требует Яндекс --- update - пока не использую
 func (p *PostgresStorage) HardDeleteURLs() error {
 	query := `
 		DELETE FROM urls

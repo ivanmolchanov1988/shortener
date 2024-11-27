@@ -4,7 +4,11 @@ import (
 	"errors"
 )
 
-var ErrURLAlreadyExists = errors.New("URL already exists")
+var (
+	ErrURLAlreadyExists = errors.New("URL already exists")
+	ErrURLIsGone        = errors.New("url is gone")
+	ErrURLNotFound      = errors.New("URL not found")
+)
 
 // Storage для всех типов хранилищ
 type Storage interface {
