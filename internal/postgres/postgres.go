@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
+	"github.com/lib/pq"
 )
 
 type PostgresStorage struct {
@@ -231,38 +232,86 @@ func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error)
 }
 
 // Для удаления URLs
-func (p *PostgresStorage) DeleteURLS(userID string, urlsTodelete []string) error {
+func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error {
 	log.Printf("The user's %s URLs to delete", userID)
 
-	out := make(chan string)
-	var wg sync.WaitGroup
-
-	for _, shortURL := range urlsTodelete {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			query := `
-				UPDATE urls 
-				SET delete_flag = TRUE 
-				WHERE user_id = $1 AND short_url = $2;
-			`
-			_, err := p.db.Exec(query, userID, url)
-			if err != nil {
-				out <- fmt.Sprintf("Failed to delete %s: %v", url, err)
-			} else {
-				out <- fmt.Sprintf("Successfully deleted %s", url)
-			}
-		}(shortURL)
-	}
-
+	urlsChan := make(chan string, len(urlsToDelete))
 	go func() {
-		wg.Wait()
-		close(out)
+		for _, url := range urlsToDelete {
+			urlsChan <- url
+		}
+		close(urlsChan)
 	}()
 
-	for msg := range out {
-		log.Println(msg)
+	// Паттерн fanIn: объединяем данные из канала в батчи
+	const batchSize = 2
+	batchChan := make(chan []string)
+
+	go func() {
+		var batch []string
+		for url := range urlsChan {
+			batch = append(batch, url)
+			if len(batch) == batchSize {
+				batchChan <- batch
+				batch = nil
+			}
+		}
+		if len(batch) > 0 {
+			batchChan <- batch
+		}
+		close(batchChan)
+	}()
+
+	// Обработка пачек
+	var wg sync.WaitGroup
+
+	var errResult error
+	for batch := range batchChan {
+		wg.Add(1)
+		go func(batch []string) {
+			defer wg.Done()
+
+			query := `
+				UPDATE urls
+				SET delete_flag = TRUE
+				WHERE user_id = $1 AND short_url = ANY($2);
+			`
+			_, err := p.db.Exec(query, userID, pq.Array(batch))
+			if err != nil {
+				if errResult != nil {
+					errResult = fmt.Errorf("failed to update batch %v: %w", batch, err)
+				}
+			} else {
+				log.Printf("Successfully deleted: %v", batch)
+			}
+		}(batch)
 	}
+
+	wg.Wait()
+
+	// УДАЛЯЕМ
+	if err := p.HardDeleteURLs(); err != nil {
+		log.Printf("Failed to hard delete marked URLs: %v", err)
+	}
+
+	return errResult
+
+}
+
+// Реальное удаление - плохо, но, вроде, требует Яндекс
+func (p *PostgresStorage) HardDeleteURLs() error {
+	query := `
+		DELETE FROM urls
+		WHERE delete_flag = TRUE;
+	`
+
+	result, err := p.db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to hard delete URLs: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	log.Printf("Hard deleted %d URLs", rows)
 
 	return nil
 }
