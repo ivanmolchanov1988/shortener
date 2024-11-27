@@ -328,7 +328,8 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, "URL not found", http.StatusNotFound)
 			return
 		}
-		http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+		//http.Error(res, "Internal Server Error", http.StatusInternalServerError) - лучше же так
+		http.Error(res, "URL not found", http.StatusNotFound)
 		return
 	}
 	res.Header().Set("Location", originURL)
