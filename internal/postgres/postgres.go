@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
@@ -136,6 +137,7 @@ func (p *PostgresStorage) createTable() error {
         short_url TEXT NOT NULL,
         original_url TEXT UNIQUE NOT NULL,
 		user_id UUID,
+		delete_flag BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
     );`
@@ -226,4 +228,41 @@ func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error)
 	}
 
 	return usersURLs, nil
+}
+
+// Для удаления URLs
+func (p *PostgresStorage) DeleteURLS(userID string, urlsTodelete []string) error {
+	log.Printf("The user's %s URLs to delete", userID)
+
+	out := make(chan string)
+	var wg sync.WaitGroup
+
+	for _, shortURL := range urlsTodelete {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			query := `
+				UPDATE urls 
+				SET delete_flag = TRUE 
+				WHERE user_id = $1 AND short_url = $2;
+			`
+			_, err := p.db.Exec(query, userID, url)
+			if err != nil {
+				out <- fmt.Sprintf("Failed to delete %s: %v", url, err)
+			} else {
+				out <- fmt.Sprintf("Successfully deleted %s", url)
+			}
+		}(shortURL)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	for msg := range out {
+		log.Println(msg)
+	}
+
+	return nil
 }

@@ -72,6 +72,7 @@ func setupHandlers(store storage.Storage, cfg *server.Config) http.Handler {
 	r.Get("/ping", handler.GetPingDB)
 	r.Post("/api/shorten/batch", handler.Batch)
 	r.Get("/api/user/urls", handler.GetUserURLS)
+	r.Delete("/api/user/urls", handler.DeleteURLS)
 
 	return r
 }

@@ -71,6 +71,12 @@ func (m *MemoryTransaction) Rollback() error {
 	return errors.New("transactions are not supported in MemoryStorage")
 }
 
+// PASS URLsForDelete
+func (m *MemoryStorage) DeleteURLS(userID string, urlsTodelete []string) error {
+	return errors.New("delete URLs for user are not supported in MemoryStorage")
+}
+
+// PASS GetUserURLS
 func (m *MemoryStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	return nil, errors.New("get URLs for user are not supported in MemoryStorage")
 }

@@ -11,9 +11,8 @@ type Storage interface {
 	SaveURL(id, shortURL, originalURL, userID string) (string, error)
 	GetURL(shortURL string) (string, error)
 	BeginTransaction() (TransactionStorage, error)
-	//SaveURLTx(tx *sql.Tx, id, shortURL, originalURL string) (string, error)
-	//Close()
 	GetUserURLS(userID string) ([]UserURLS, error)
+	DeleteURLS(userID string, urlsTodelete []string) error
 }
 
 // для операций внутри транзакций

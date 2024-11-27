@@ -139,3 +139,8 @@ func (f *FileStorage) SaveURLTx(id, shortURL, originalURL, userID string) (strin
 func (f *FileStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	return nil, errors.New("get URLs for user is not in FileStorage")
 }
+
+// PASS для URLsForDelete
+func (f *FileStorage) DeleteURLS(userID string, urlsTodelete []string) error {
+	return errors.New("delete URLs is not in FileStorage")
+}

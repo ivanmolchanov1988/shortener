@@ -143,7 +143,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 			if err != nil {
 				log.Printf("Database initialization failed, switching to memory storage: %v", err)
 				store = memory.NewMemoryStorage()
-				//return nil, nil, fmt.Errorf("failed to initialize database: %w", err)
 			} else {
 				store, err = postgr.NewPostgresStorage(db)
 				if err != nil {
@@ -151,13 +150,7 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 				}
 				log.Println("Storage initialized with Postgre")
 			}
-			// store, err = postgr.NewPostgresStorage(db)
-			// if err != nil {
-			// 	return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
-			// }
-			// log.Println("Storage initialized with Postgre")
 		case cfg.FileStoragePath != "":
-			//store, err = filestore.NewFileStorage(cfg.FileStoragePath)
 			store, err = initializeFileStorage(cfg.FileStoragePath)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create file storage: %w", err)

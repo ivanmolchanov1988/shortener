@@ -382,7 +382,6 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FUUUU!
 	for i := range urls {
 		urls[i].ShortURL = fmt.Sprintf("%s/%s", h.config.BaseURL, urls[i].ShortURL)
 	}
@@ -393,4 +392,38 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//json.NewEncoder(w).Encode(urls)
+}
+
+// DELETE USER URLS
+func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
+	if req.Header.Get("Content-Type") != "application/json" {
+		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, false)
+	if err != nil {
+		http.Error(res, "Unauthorized for delete", http.StatusUnauthorized)
+		return
+	}
+
+	var shortURLs4Delete []string
+	err = json.NewDecoder(req.Body).Decode(&shortURLs4Delete)
+	if err != nil {
+		http.Error(res, "Error reading request body for delete", http.StatusBadRequest)
+		return
+	}
+
+	if len(shortURLs4Delete) == 0 {
+		http.Error(res, "There are no URLs to delete", http.StatusBadRequest)
+		return
+	}
+
+	err = h.storage.DeleteURLS(userID, shortURLs4Delete)
+	if err != nil {
+		http.Error(res, "Error deleting URLs", http.StatusInternalServerError)
+		return
+	}
+
+	res.WriteHeader(http.StatusAccepted)
 }
