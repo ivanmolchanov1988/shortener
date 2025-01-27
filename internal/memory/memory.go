@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ivanmolchanov1988/shortener/internal/filestore"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
 type MemoryStorage struct {
@@ -13,31 +14,29 @@ type MemoryStorage struct {
 	mu          sync.RWMutex
 }
 
-func NewStorage(fileStorage *filestore.FileStorage) (*MemoryStorage, error) {
-	memStorage := &MemoryStorage{
-		data:        make(map[string]string),
-		fileStorage: fileStorage,
+func NewMemoryStorage() *MemoryStorage {
+	return &MemoryStorage{
+		data: make(map[string]string),
 	}
-
-	// Загрузка даты из файла
-	if err := memStorage.loadDataFromFile(); err != nil {
-		return nil, err
-	}
-
-	return memStorage, nil
 }
 
-func (m *MemoryStorage) SaveURL(shortURL, originalURL string) error {
+// PASS transaction
+type MemoryTransaction struct{}
+
+func (m *MemoryStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.data[shortURL] = originalURL
-	// в файл
-	if err := m.fileStorage.SaveURL(shortURL, originalURL); err != nil {
-		return err
+	// Cуществует уже такой originalURL?
+	for existingShortURL, existingOriginalURL := range m.data {
+		if existingOriginalURL == originalURL {
+			// Возвращаем существующий shortURL и ошибку
+			return existingShortURL, storage.ErrURLAlreadyExists
+		}
 	}
 
-	return nil
+	m.data[shortURL] = originalURL
+	return shortURL, nil
 }
 
 func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
@@ -46,23 +45,40 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		return "", errors.New("the URL not found")
+		return "", errors.New("URL not found")
 	}
 	return originalURL, nil
 }
 
-func (m *MemoryStorage) loadDataFromFile() error {
-	data, err := m.fileStorage.LoadDataFromFile()
-	if err != nil {
-		return err
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, item := range data {
-		m.data[item.ShortURL] = item.OriginalURL
-	}
-
-	return nil
+// PASS для БД BeginTransaction
+func (m *MemoryStorage) BeginTransaction() (storage.TransactionStorage, error) {
+	return nil, errors.New("transaction is not in MemoryStorage")
 }
+
+// PASS для БД SaveURLTx
+func (m *MemoryStorage) SaveURLTx(id, shortURL, originalURL string) (string, error) {
+	//return m.SaveURL(id, shortURL, originalURL)
+	return "", errors.New("transactions are not supported in MemoryStorage")
+}
+
+// PASS Commit
+func (m *MemoryTransaction) Commit() error {
+	return errors.New("transactions are not supported in MemoryStorage")
+}
+
+// PASS Rollback
+func (m *MemoryTransaction) Rollback() error {
+	return errors.New("transactions are not supported in MemoryStorage")
+}
+
+// PASS URLsForDelete
+func (m *MemoryStorage) DeleteURLS(userID string, urlsTodelete []string) error {
+	return errors.New("delete URLs for user are not supported in MemoryStorage")
+}
+
+// PASS GetUserURLS
+func (m *MemoryStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
+	return nil, errors.New("get URLs for user are not supported in MemoryStorage")
+}
+
+var _ storage.Storage = (*MemoryStorage)(nil)
