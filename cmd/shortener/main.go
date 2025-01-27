@@ -22,6 +22,8 @@ import (
 	_ "net/http/pprof"
 )
 
+// goimports - nothing to commit, working tree clean
+
 func main() {
 	go func() {
 		log.Println("Starting pprof server on localhost:6060")
