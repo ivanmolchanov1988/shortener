@@ -18,9 +18,16 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+
+	_ "net/http/pprof"
 )
 
 func main() {
+	go func() {
+		log.Println("Starting pprof server on localhost:6060")
+		log.Println(http.ListenAndServe("localhost:6060", nil)) // Сервер профилирования
+	}()
+
 	cfg, store, err := server.InitConfigAndPrepareStorage()
 	if err != nil {
 		log.Fatalf("INIT is failed: %v\n", err)
