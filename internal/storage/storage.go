@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+// Ошибки.
 var (
 	ErrURLAlreadyExists = errors.New("URL already exists")
 	ErrURLIsGone        = errors.New("url is gone")
