@@ -19,6 +19,7 @@ func RandStr(n int) (string, error) {
 		}
 		b[i] = allowedChars[num.Int64()]
 	}
+
 	return string(b), nil
 }
 
