@@ -115,15 +115,6 @@ func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 		return nil, fmt.Errorf("failed to prepare select statement: %w", err)
 	}
 
-	// DELETE - пока не надо
-	// deleteStmt, err := db.Prepare(`
-	// 	DELETE FROM urls
-	// 	WHERE delete_flag = TRUE;
-	// `)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to prepare delete statement: %w", err)
-	// }
-
 	// SELECT URLs FROM USER ID
 	selectUrlsFromUserID, err := db.Prepare(`
 		SELECT short_url, original_url FROM urls WHERE user_id = $1`)
@@ -303,9 +294,6 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 			`
 			_, err := p.db.Exec(query, userID, pq.Array(batch))
 			if err != nil {
-				// if errResult != nil {
-				// 	errResult = fmt.Errorf("failed to update batch %v: %w", batch, err)
-				// }
 				once.Do(func() {
 					errChan <- err
 				})
@@ -321,11 +309,6 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 	if err := <-errChan; err != nil {
 		return fmt.Errorf("failed to delete URLs: %w", err)
 	}
-
-	// УДАЛЯЕМ
-	// if err := p.HardDeleteURLs(); err != nil {
-	// 	log.Printf("Failed to hard delete marked URLs: %v", err)
-	// }
 
 	return nil
 

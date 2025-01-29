@@ -1,29 +1,28 @@
 package handlers
 
 import (
-	"compress/gzip"
-	"database/sql"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"github.com/ivanmolchanov1988/shortener/internal/auth"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
+// Handler отвечает за обработку HTTP-запросов.
 type Handler struct {
-	storage   storage.Storage
-	txStorage storage.TransactionStorage
-	config    *server.Config
+	storage storage.Storage
+	config  *server.Config
 }
 
+// Создание нового Handler.
 func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
 	if cfg == nil {
 		panic("can't be nil for cfg")
@@ -39,35 +38,19 @@ func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
 }
 
 // //////// POST //////////
+
+// PostURL обрабатывает запрос POST для создания нового сокращенного URL.
+// Принимает URL в теле запроса и возвращает сокращенную версию.
 func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	contentType := req.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/x-gzip") {
-		http.Error(res, "Content-Type must be text/plain or application/x-gzip", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Content-Type must be text/plain or application/x-gzip")
 		return
 	}
 
-	var body []byte
-	var err error
-
-	if req.Header.Get("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(req.Body)
-		if err != nil {
-			http.Error(res, "Failed to decompress gzip body", http.StatusBadRequest)
-			return
-		}
-		defer gz.Close()
-		body, err = io.ReadAll(gz)
-		if err != nil {
-			http.Error(res, "Unable to read body", http.StatusBadRequest)
-			return
-		}
-	} else {
-		body, err = io.ReadAll(req.Body)
-	}
-
-	// #4.2 Сервер принимает в теле запроса строку URL
+	body, err := readRequestBody(req)
 	if err != nil {
-		http.Error(res, "Unable to read body", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Failed to read body")
 		return
 	}
 	defer req.Body.Close()
@@ -75,54 +58,47 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	urlStr := string(body)
 	_, err = url.ParseRequestURI(urlStr)
 	if err != nil {
-		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Invalid URL")
 		return
 	}
 
-	// Забираем рандомную строку для ссылки
+	// Забираем рандомную строку для ссылки.
 	shortURL, err := utils.RandStr(8)
 	if err != nil {
-		http.Error(res, "Unable to generate short URL", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusInternalServerError, "Failed to generate short URL")
 		return
 	}
-	// Сохраним URL
+	// Сохраним URL.
 	id := utils.GenUUID()
 
-	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		//http.Error(res, "Unauthorized", http.StatusUnauthorized)
-		log.Printf("Error fetching user ID: %v", err)
-		http.Error(res, "Error fetching user ID", http.StatusInternalServerError)
+		writeErrorResponse(res, http.StatusInternalServerError, "Error fetching user ID")
 		return
 	}
 
 	existingShortURL, err := h.storage.SaveURL(id, shortURL, urlStr, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExists) {
-			// Возвращаем HTTP 409 Conflict и существующий shortURL
-			res.Header().Set("Content-Type", "text/plain")
-			res.WriteHeader(http.StatusConflict)
-			fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL)
-			res.Write([]byte(fullShortURL))
+			handleConflictResponse(res, h.config.BaseURL, existingShortURL)
 			return
 		}
-		log.Printf("Failed to save URL: %v", err)
-		http.Error(res, "Error saving URL", http.StatusInternalServerError)
+		writeErrorResponse(res, http.StatusInternalServerError, "Error saving URL")
 		return
 	}
 	log.Printf("Successfully saved URL: shortURL=%s, originalURL=%s", shortURL, urlStr)
 
-	// #2 Header Content-Type = text/plain
 	res.Header().Set("Content-Type", "text/plain")
-	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
-	// #5 возвращает ответ с сокращённым URL
-	fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
-	res.Write([]byte(fullShortURL))
+	res.Write([]byte(generateShortURL(h.config.BaseURL, shortURL)))
 
 }
 
 // ///////// POST BATCH ////////
+
+// Batch обрабатывает запрос POST для создания нового списка сокращенных URLs.
+// Принимает массив объектов из correlation_id и original_url в теле запроса.
+// Возвращает массив объктов из correlation_id и short_url.
 func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 	// Проверка Content-Type
 	if req.Header.Get("Content-Type") != "application/json" {
@@ -130,19 +106,11 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Структура для входящего запроса
-	var requestData []struct {
+	// Читаем тело запроса и декодируем JSON.
+	requestData, err := decodeRequestBody[[]struct {
 		CorrelationID string `json:"correlation_id"`
 		OriginalURL   string `json:"original_url"`
-	}
-	// ... исходящего
-	var responseData []struct {
-		CorrelationID string `json:"correlation_id"`
-		ShortURL      string `json:"short_url"`
-	}
-
-	// Декодер JSON
-	err := json.NewDecoder(req.Body).Decode(&requestData)
+	}](req)
 	if err != nil {
 		http.Error(res, "Error decoding request body", http.StatusBadRequest)
 		return
@@ -154,51 +122,17 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
-	//defer tx.Rollback()
 	defer func() {
 		if err != nil {
 			tx.Rollback()
 		}
 	}()
 
-	for _, item := range requestData {
-		// Валидируем URL
-		_, err := url.ParseRequestURI(item.OriginalURL)
-		if err != nil {
-			http.Error(res, fmt.Sprintf("Invalid URL: %s", item.OriginalURL), http.StatusBadRequest)
-			return
-		}
-
-		// Генерируем уникальную короткую ссылку
-		shortURL, err := utils.RandStr(8)
-		if err != nil {
-			http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
-			return
-		}
-
-		// Сохраняем URL в рамках транзакции
-		id := utils.GenUUID()
-		//_, err = h.txStorage.SaveURLTx(tx, id, shortURL, item.OriginalURL)
-		userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
-		if err != nil {
-			http.Error(res, "Error for user ID", http.StatusInternalServerError)
-			return
-		}
-
-		_, err = tx.SaveURLTx(id, shortURL, item.OriginalURL, userID)
-		if err != nil {
-			http.Error(res, "Error saving URL", http.StatusInternalServerError)
-			return
-		}
-
-		// Заполняем ответ
-		responseData = append(responseData, struct {
-			CorrelationID string `json:"correlation_id"`
-			ShortURL      string `json:"short_url"`
-		}{
-			CorrelationID: item.CorrelationID,
-			ShortURL:      fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
-		})
+	// Обрабатываем каждый URL
+	responseData, err := h.processBatch(requestData, tx, res, req)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// Завершаем транзакцию
@@ -207,33 +141,24 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Устанавливаем Content-Type и код состояния
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusCreated)
-
-	// Кодируем и отправляем JSON ответ
-	err = json.NewEncoder(res).Encode(responseData)
-	if err != nil {
-		http.Error(res, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+	// Отправляем ответ
+	writeJSONResponse(res, http.StatusCreated, responseData)
 }
 
 // //////// SHORTEN //////////
+
+// Shorten обрабатывает запрос POST для создания нового сокращенного URL.
+// Принимает URL как json с параметром url в теле запроса и возвращает сокращенную версию.
 func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
-	// Content-Type - application/json
 	if req.Header.Get("Content-Type") != "application/json" {
 		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
 		return
 	}
 
-	// Структура для входящего запроса
-	var requestData struct {
+	// Декодируем тело запроса
+	requestData, err := decodeRequestBody[struct {
 		URL string `json:"url"`
-	}
-
-	// Декодируем JSON
-	err := json.NewDecoder(req.Body).Decode(&requestData)
+	}](req)
 	if err != nil {
 		http.Error(res, "Error reading request body", http.StatusBadRequest)
 		return
@@ -253,139 +178,71 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Сохраняем URL
-	id := utils.GenUUID()
-
-	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
+	// Получаем userID из куки
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		http.Error(res, "Error for user ID", http.StatusInternalServerError)
+		http.Error(res, "Error fetching user ID", http.StatusInternalServerError)
 		return
 	}
 
-	existingShortURL, err := h.storage.SaveURL(id, shortURL, requestData.URL, userID)
+	// Сохраняем URL
+	existingShortURL, err := h.storage.SaveURL(utils.GenUUID(), shortURL, requestData.URL, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExists) {
 			// Возвращаем HTTP 409 Conflict и уже существующий shortURL
-			res.Header().Set("Content-Type", "application/json")
-			res.WriteHeader(http.StatusConflict)
-			responseData := struct {
-				Result string `json:"result"`
-			}{
-				Result: fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL),
-			}
-			err = json.NewEncoder(res).Encode(responseData)
-			if err != nil {
-				http.Error(res, "Error encoding response", http.StatusInternalServerError)
-			}
+			handleConflict(res, fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL))
 			return
 		}
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
 
-	// err = h.storage.SaveURL(id, shortURL, requestData.URL)
-	// if err != nil {
-	// 	http.Error(res, "Error saving URL", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// Структуру ответа
-	responseData := struct {
+	// Формируем и отправляем успешный ответ
+	writeJSONResponse(res, http.StatusCreated, struct {
 		Result string `json:"result"`
 	}{
 		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
-	}
-
-	// Заголовок Content-Type для ответа
-	res.Header().Set("Content-Type", "application/json")
-	// 201 Created
-	res.WriteHeader(http.StatusCreated)
-	// responseData в JSON
-	err = json.NewEncoder(res).Encode(responseData)
-	if err != nil {
-		http.Error(res, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+	})
 }
 
 // ///////// GET //////////
+
+// GetURL обрабатывает запрос GET вида http://{server}/{shortURL} и возвращает полный URL.
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
-	// #7 парсинг ссылки
-	idLink := strings.TrimPrefix(req.URL.Path, "/")
+	idLink := extractIDFromPath(req.URL.Path)
 	if idLink == "" {
-		http.Error(res, "Invalid or empty ID", http.StatusNotFound)
+		writeErrorResponse(res, http.StatusNotFound, "Invalid or empty ID")
 		return
 	}
-	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
-	// 404, если не найден
+
+	// Получаем оригинальный URL
 	originURL, err := h.storage.GetURL(idLink)
 	if err != nil {
-		if errors.Is(err, storage.ErrURLIsGone) {
-			http.Error(res, "URL is gone", http.StatusGone)
-			return
-		}
-		if errors.Is(err, storage.ErrURLNotFound) {
-			http.Error(res, "URL not found", http.StatusNotFound)
-			return
-		}
-		//http.Error(res, "Internal Server Error", http.StatusInternalServerError) - лучше же так
-		http.Error(res, "URL not found", http.StatusNotFound)
+		h.handleStorageError(res, err)
 		return
 	}
-	res.Header().Set("Location", originURL)
-	res.WriteHeader(http.StatusTemporaryRedirect)
+
+	writeRedirectResponse(res, originURL, http.StatusTemporaryRedirect)
 }
 
-// DB ping
-func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
-	dbDSN := h.config.DatabaseDsn
-	db, err := sql.Open("postgres", dbDSN)
-	if err != nil {
-		http.Error(res, "Failed to connect to database", http.StatusInternalServerError)
-	}
-	defer db.Close()
+// ///////// GET USER URLS //////////
 
-	res.WriteHeader(http.StatusOK)
-
-}
-
-// UserID From Cookie
-func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, createIfMissing bool) (string, error) {
-	tokenString, err := auth.GetTokenFromCookie(r)
-	if err != nil {
-		if createIfMissing {
-			return auth.CreateCookie(w, secret)
-		}
-
-		return "", err
-	}
-
-	userID, err := auth.GetUserID(secret, tokenString)
-	if err != nil {
-		if createIfMissing {
-			return auth.CreateCookie(w, secret)
-		}
-
-		return "", err
-	}
-
-	return userID, nil
-}
-
-// GET USER URLS
+// GetUserURLS обрабатывает запрос GET вида http://{server}/api/user/urls и возвращает массив с short и original urls.
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
-	userID, err := GetUserIDFromCookie(w, r, h.config.Secret, false)
+	userID, err := getUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
+	// Получение URLs пользователя
 	urls, err := h.storage.GetUserURLS(userID)
 	if err != nil {
-		http.Error(w, "Failed to get user URLs", http.StatusInternalServerError)
+		writeErrorResponse(w, http.StatusInternalServerError, "Failed to get user URLs")
 		return
 	}
 
+	// Если URLs нет, отправляем HTTP 204
 	if len(urls) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -395,50 +252,57 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 		urls[i].ShortURL = fmt.Sprintf("%s/%s", h.config.BaseURL, urls[i].ShortURL)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(urls); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-	//json.NewEncoder(w).Encode(urls)
+	writeJSONResponse(w, http.StatusOK, urls)
 }
 
-// DELETE USER URLS
+// ///////// DELETE USER URLS ///////////
+
+// DeleteURLS обрабатывает запрос DELETE вида http://{server}/api/user/urls.
+// Принимает в теле массив из строк с shortURLs и удаляет их.
 func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 	if req.Header.Get("Content-Type") != "application/json" {
-		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Content-Type must be application/json")
 		return
 	}
 
-	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, false)
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, false)
 	if err != nil {
-		http.Error(res, "Unauthorized for delete", http.StatusUnauthorized)
+		writeErrorResponse(res, http.StatusUnauthorized, "Unauthorized for delete")
 		return
 	}
 
 	var shortURLs4Delete []string
 	err = json.NewDecoder(req.Body).Decode(&shortURLs4Delete)
 	if err != nil {
-		http.Error(res, "Error reading request body for delete", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Error reading request body for delete")
 		return
 	}
 
 	if len(shortURLs4Delete) == 0 {
-		http.Error(res, "There are no URLs to delete", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "There are no URLs to delete")
 		return
 	}
 
-	go func() {
-		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
-			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
-		}
-	}()
+	// go func() {
+	// 	if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
+	// 		log.Printf("Failed to delete URLs for user %s: %v", userID, err)
+	// 	}
+	// }()
+	// --- Стоит добавить таймаут для асинхронных операций ---
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// err = h.storage.DeleteURLS(userID, shortURLs4Delete)
-	// if err != nil {
-	// 	http.Error(res, "Error deleting URLs", http.StatusInternalServerError)
-	// 	return
-	// }
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			log.Printf("Timeout reached for deleting URLs for user %s", userID)
+			return
+		default:
+			if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
+				log.Printf("Failed to delete URLs for user %s: %v", userID, err)
+			}
+		}
+	}(ctx)
 
 	res.WriteHeader(http.StatusAccepted)
 }

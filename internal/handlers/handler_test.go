@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	//"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/require"
@@ -29,7 +28,7 @@ func init() {
 	flag.CommandLine = flag.NewFlagSet("", flag.ExitOnError)
 }
 
-func TestPostUrl(t *testing.T) {
+func TestPostURL(t *testing.T) {
 
 	tests := []struct { // мне надо передать: контент, тело. Жду: код, ответ, контент
 		name        string
@@ -101,16 +100,7 @@ func TestPostUrl(t *testing.T) {
 		},
 	}
 
-	//memStore := memory.NewMemoryStorage()
-	//fStore, err := filestore.NewFileStorage(cfg.FileStoragePath)
-	// if err != nil {
-	// 	t.Errorf("Error for filestore %v", err)
-	// }
-	//memStore, err := memory.NewStorage(fStore)
 	memStore := memory.NewMemoryStorage()
-	// if err != nil {
-	// 	t.Errorf("Error for memStore %v", err)
-	// }
 	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -167,15 +157,7 @@ func TestPostUrl(t *testing.T) {
 }
 
 func TestShorten(t *testing.T) {
-	//memStore := memory.NewMemoryStorage()
-	// fStore, err := filestore.NewFileStorage(cfg.FileStoragePath)
-	// if err != nil {
-	// 	t.Errorf("Error for fileStore %v", err)
-	// }
 	memStore := memory.NewMemoryStorage()
-	// if err != nil {
-	// 	t.Errorf("Error for memStore %v", err)
-	// }
 	handler := NewHandler(memStore, cfg)
 
 	urlToSend := `{"url":"https://example.com"}`
@@ -237,7 +219,7 @@ func TestShorten(t *testing.T) {
 	}
 }
 
-func TestGetUrl(t *testing.T) {
+func TestGetURL(t *testing.T) {
 
 	//запись для тестов
 	testShortURL := "testURL"
@@ -245,14 +227,7 @@ func TestGetUrl(t *testing.T) {
 	id := "Qwerty"
 	testUserID := "123333"
 
-	// fStore, err := filestore.NewFileStorage(cfg.FileStoragePath)
-	// if err != nil {
-	// 	t.Errorf("Error for fileStore %v", err)
-	// }
 	memStore := memory.NewMemoryStorage()
-	// if err != nil {
-	// 	t.Errorf("Error for memStore %v", err)
-	// }
 	handler := NewHandler(memStore, cfg)
 
 	if _, err := memStore.SaveURL(id, testShortURL, "https://testURL123.ru", testUserID); err != nil {

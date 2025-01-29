@@ -82,18 +82,8 @@ func (f *FileStorage) GetURL(shortURL string) (string, error) {
 		}
 	}
 
-	return "", errors.New("URL not found")
-}
-
-func (f *FileStorage) saveData(data []ShortLinkData) error {
-	file, err := os.Create(f.filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(data)
+	//return "", errors.New("URL not found")
+	return "", storage.ErrURLNotFound
 }
 
 func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {

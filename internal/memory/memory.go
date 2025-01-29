@@ -45,7 +45,8 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		return "", errors.New("URL not found")
+		//return "", errors.New("URL not found")
+		return "", storage.ErrURLNotFound
 	}
 	return originalURL, nil
 }

@@ -40,15 +40,6 @@ func main() {
 	// отправим secret
 	auth.GetTimeForExpire(cfg.TimeToExpire)
 
-	// if store == nil {
-	// 	log.Fatalf("CFG is failed: %v\n", store)
-	// }
-	// if cfg == nil {
-	// 	log.Fatalf("CFG is failed: %v\n", cfg)
-	// }
-
-	//defer store.Close()
-
 	// Логгер
 	if err := logger.Initialize(cfg.Logging); err != nil {
 		log.Fatalf("Logger initialization failed: %v\n", err)

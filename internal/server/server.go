@@ -73,11 +73,6 @@ func getFlags() FlagsConfig {
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
-	//db
-	// dsn4flag := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-	// 	baseDSN.host, baseDSN.port, baseDSN.user, baseDSN.password, baseDSN.dbname, baseDSN.sslmode)
-	//tempDB := flag.String("d", dsn4flag, "Postgre DSN")
-	//OR
 	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 
 	flag.Parse()
@@ -165,19 +160,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	} else {
 		return nil, nil, fmt.Errorf("failed from config: %w", err)
 	}
-}
-
-func creteDBconnection(dbDSN string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dbDSN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
-	}
-	// Проверка подключения
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %v", err)
-	}
-	return db, nil
-
 }
 
 // Для автотестов Яндекса
