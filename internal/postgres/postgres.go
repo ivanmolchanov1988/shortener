@@ -11,6 +11,7 @@ import (
 	"github.com/lib/pq"
 )
 
+// PostgresStorage - структура для хранения в PSQL.
 type PostgresStorage struct {
 	db                   *sql.DB
 	insertStmt           *sql.Stmt
@@ -20,11 +21,12 @@ type PostgresStorage struct {
 	selectUrlsFromUserID *sql.Stmt
 }
 
+// PostgresTransaction - структура для транзакций.
 type PostgresTransaction struct {
 	tx *sql.Tx
 }
 
-// Для транзакций 1
+// BeginTransaction для начала транзакции.
 func (p *PostgresStorage) BeginTransaction() (storage.TransactionStorage, error) {
 	if p.db == nil {
 		return nil, errors.New("database connection is nil")
@@ -36,7 +38,7 @@ func (p *PostgresStorage) BeginTransaction() (storage.TransactionStorage, error)
 	return &PostgresTransaction{tx: tx}, nil
 }
 
-// Для транзакций 2
+// SaveURLTx сохраняет URL в базе данных в рамках транзакции.
 func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL, userID string) (string, error) {
 	var existingShortURL string
 	query := `
@@ -61,16 +63,17 @@ func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL, userID string
 	return existingShortURL, nil
 }
 
-// Commit завершает транзакцию
+// Commit завершает транзакцию.
 func (t *PostgresTransaction) Commit() error {
 	return t.tx.Commit()
 }
 
-// Rollback откатывает транзакцию
+// Rollback откатывает транзакцию.
 func (t *PostgresTransaction) Rollback() error {
 	return t.tx.Rollback()
 }
 
+// GetShortURLByOriginalURLTx собирает выборку с short_url из БД, на вход принимает original_url.
 func (p *PostgresStorage) GetShortURLByOriginalURLTx(tx *sql.Tx, originalURL string) (string, error) {
 	var shortURL string
 	query := `SELECT short_url FROM urls WHERE original_url = $1;`
@@ -84,6 +87,7 @@ func (p *PostgresStorage) GetShortURLByOriginalURLTx(tx *sql.Tx, originalURL str
 	return shortURL, nil
 }
 
+// NewPostgresStorage создаёт хранилище в БД и подготавливает запросы.
 func NewPostgresStorage(db *sql.DB) (*PostgresStorage, error) {
 	storage := &PostgresStorage{db: db}
 	// Проверяем наличие таблицы
@@ -158,8 +162,7 @@ func (p *PostgresStorage) createTable() error {
 	return nil
 }
 
-//var ErrURLAlreadyExists = errors.New("URL already exists")
-
+// SaveURL сохраняет URLs в БД.
 func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s, userID=%s", id, shortURL, originalURL, userID)
 	var existingShortURL string
@@ -181,6 +184,7 @@ func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (str
 	return existingShortURL, nil
 }
 
+// GetURL забирает оригинальный URL из БД.
 func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 	var originalURL string
 	var deleteFlag bool
@@ -197,6 +201,7 @@ func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 	return originalURL, nil
 }
 
+// GetShortURLByOriginalURL забирает короткую ссылку по оригинальному URL.
 func (p *PostgresStorage) GetShortURLByOriginalURL(originalURL string) (string, error) {
 	var shortURL string
 	err := p.selectByOrig.QueryRow(originalURL).Scan(&shortURL)
@@ -206,6 +211,7 @@ func (p *PostgresStorage) GetShortURLByOriginalURL(originalURL string) (string, 
 	return shortURL, nil
 }
 
+// Close закрывает соединение.
 func (p *PostgresStorage) Close() error {
 	if err := p.insertStmt.Close(); err != nil {
 		return err
@@ -219,7 +225,7 @@ func (p *PostgresStorage) Close() error {
 	return p.db.Close()
 }
 
-// Для списка URLs пользователя
+// GetUserURLS возвращает все URLs текущего пользователя.
 func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	log.Printf("URLs for userID: %s", userID)
 	rows, err := p.selectUrlsFromUserID.Query(userID)
@@ -244,7 +250,7 @@ func (p *PostgresStorage) GetUserURLS(userID string) ([]storage.UserURLS, error)
 	return usersURLs, nil
 }
 
-// Для удаления URLs
+// DeleteURLS удаляет переданные URLs.
 func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error {
 	log.Printf("The user's %s URLs to delete", userID)
 
@@ -312,22 +318,4 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 
 	return nil
 
-}
-
-// Реальное удаление - плохо, но, вроде, требует Яндекс --- update - пока не использую
-func (p *PostgresStorage) HardDeleteURLs() error {
-	query := `
-		DELETE FROM urls
-		WHERE delete_flag = TRUE;
-	`
-
-	result, err := p.db.Exec(query)
-	if err != nil {
-		return fmt.Errorf("failed to hard delete URLs: %w", err)
-	}
-
-	rows, _ := result.RowsAffected()
-	log.Printf("Hard deleted %d URLs", rows)
-
-	return nil
 }

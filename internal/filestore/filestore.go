@@ -10,6 +10,7 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
+// ShortLinkData определяет структуру для хранения информации о ссылках.
 type ShortLinkData struct {
 	UUID        string `json:"id"`
 	ShortURL    string `json:"short_url"`
@@ -17,6 +18,7 @@ type ShortLinkData struct {
 	UserID      string `json:"user_id"`
 }
 
+// FileStorage управляет хранилищем URL-адресов в файле.
 type FileStorage struct {
 	filePath      string
 	shortLinkData []ShortLinkData
@@ -25,6 +27,7 @@ type FileStorage struct {
 
 var _ storage.Storage = (*FileStorage)(nil)
 
+// NewFileStorage создаёт файловое хранилище.
 func NewFileStorage(filePath string) (*FileStorage, error) {
 	fs := &FileStorage{
 		filePath:      filePath,
@@ -38,6 +41,7 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 	return fs, nil
 }
 
+// SaveURL сохраняет URLs в файловое хранилище.
 func (f *FileStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -72,6 +76,7 @@ func (f *FileStorage) SaveURL(id, shortURL, originalURL, userID string) (string,
 	return shortURL, nil
 }
 
+// GetURL забирает URL из файлового хранилища.
 func (f *FileStorage) GetURL(shortURL string) (string, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -86,6 +91,7 @@ func (f *FileStorage) GetURL(shortURL string) (string, error) {
 	return "", storage.ErrURLNotFound
 }
 
+// LoadDataFromFile загружает данные из файлового хранилища
 func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -115,22 +121,22 @@ func (f *FileStorage) LoadDataFromFile() ([]ShortLinkData, error) {
 	return data, nil
 }
 
-// PASS для БД BeginTransaction
+// BeginTransaction - PASS для БД.
 func (f *FileStorage) BeginTransaction() (storage.TransactionStorage, error) {
 	return nil, errors.New("transaction is not in FileStorage")
 }
 
-// PASS для БД SaveURLTx
+// SaveURLTx - PASS для БД.
 func (f *FileStorage) SaveURLTx(id, shortURL, originalURL, userID string) (string, error) {
 	return f.SaveURL(id, shortURL, originalURL, userID)
 }
 
-// PASS для URLs для user
+// GetUserURLS - PASS для URLs для user.
 func (f *FileStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	return nil, errors.New("get URLs for user is not in FileStorage")
 }
 
-// PASS для URLsForDelete
+// DeleteURLS - PASS для URLsForDelete.
 func (f *FileStorage) DeleteURLS(userID string, urlsTodelete []string) error {
 	return errors.New("delete URLs is not in FileStorage")
 }

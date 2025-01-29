@@ -7,8 +7,10 @@ import (
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
+// TimeForExpire - время протухания токена.
 var TimeForExpire int
 
+// GetTimeForExpire пересохраняет время протухания в глобальную переменную.
 func GetTimeForExpire(timeForExpire int) {
 	TimeForExpire = timeForExpire
 }
@@ -24,7 +26,7 @@ func setTokenCookie(w http.ResponseWriter, token string, duration time.Duration)
 	})
 }
 
-// JWT из куки
+// GetTokenFromCookie забирает токен из куков HTTP-запроса.
 func GetTokenFromCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
@@ -34,6 +36,7 @@ func GetTokenFromCookie(r *http.Request) (string, error) {
 	return cookie.Value, nil
 }
 
+// CreateCookie пишет токен в куки.
 func CreateCookie(w http.ResponseWriter, secret string) (string, error) {
 	userID := utils.GenUUID()
 	token, err := buildJWTString(secret, userID, time.Hour*time.Duration(TimeForExpire))

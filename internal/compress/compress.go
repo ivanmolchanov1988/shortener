@@ -49,6 +49,7 @@ type gzipWriter struct {
 	writer *gzip.Writer
 }
 
+// Write сжимает данные в gzip.
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.writer.Write(b)
 }
@@ -58,6 +59,7 @@ type zlibWriter struct {
 	writer *zlib.Writer
 }
 
+// Write сжимает данные в zlib.
 func (w zlibWriter) Write(b []byte) (int, error) {
 	return w.writer.Write(b)
 }
@@ -77,6 +79,7 @@ func isCompressible(contentType string) bool {
 	return false
 }
 
+// NewCompressHandler сжимает данные.
 func NewCompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
@@ -87,24 +90,17 @@ func NewCompressHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// if strings.Contains(contentType, "application/json") ||
-		// 	strings.Contains(contentType, "text/html") ||
-		// 	strings.Contains(contentType, "application/x-gzip") {
 		ae := r.Header.Get("Accept-Encoding")
 		switch {
 		case strings.Contains(ae, "gzip"):
-			//gz := gzip.NewWriter(w)
 			gz := getGzipWriter(w)
-			//defer gz.Close()
 			defer putGzipWriter(gz)
 			gzw := &gzipWriter{ResponseWriter: w, writer: gz}
 			w.Header().Set("Content-Encoding", "gzip")
 			w.Header().Set("Vary", "Accept-Encoding") // +Ответ может меняться
 			next.ServeHTTP(gzw, r)
 		case strings.Contains(ae, "deflate"):
-			//zl := zlib.NewWriter(w)
 			zl := getZlibWriter(w)
-			//defer zl.Close()
 			defer putZlibWriter(zl)
 			zlw := &zlibWriter{ResponseWriter: w, writer: zl}
 			w.Header().Set("Content-Encoding", "deflate")
@@ -113,13 +109,11 @@ func NewCompressHandler(next http.Handler) http.Handler {
 		default:
 			next.ServeHTTP(w, r)
 		}
-		// } else {
-		// 	next.ServeHTTP(w, r)
-		// }
 
 	})
 }
 
+// DecompressHandler декодирует данные.
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var reader io.ReadCloser

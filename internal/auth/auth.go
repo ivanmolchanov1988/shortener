@@ -8,11 +8,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// type Claims struct {
-// 	jwt.RegisteredClaims
-// 	UserID int `json:"user_id"`
-// }
-
 func buildJWTString(secret string, userID string, duration time.Duration) (string, error) {
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -31,6 +26,7 @@ func buildJWTString(secret string, userID string, duration time.Duration) (strin
 	return tokenString, nil
 }
 
+// GetUserID получает и валедирует User ID.
 func GetUserID(secret string, tokenString string) (string, error) {
 	claims := &Claims{}
 

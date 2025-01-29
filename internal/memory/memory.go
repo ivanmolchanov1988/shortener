@@ -8,12 +8,14 @@ import (
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
+// MemoryStorage - структура для хранения данных в памяти.
 type MemoryStorage struct {
 	data        map[string]string
 	fileStorage *filestore.FileStorage
 	mu          sync.RWMutex
 }
 
+// NewMemoryStorage возвращает мапу MemoryStorage.
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		data: make(map[string]string),
@@ -23,6 +25,7 @@ func NewMemoryStorage() *MemoryStorage {
 // PASS transaction
 type MemoryTransaction struct{}
 
+// SaveURL сохраняет URLs в MemoryStorage.
 func (m *MemoryStorage) SaveURL(id, shortURL, originalURL, userID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -39,45 +42,45 @@ func (m *MemoryStorage) SaveURL(id, shortURL, originalURL, userID string) (strin
 	return shortURL, nil
 }
 
+// GetURL забирает URLs из MemoryStorage.
 func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		//return "", errors.New("URL not found")
 		return "", storage.ErrURLNotFound
 	}
 	return originalURL, nil
 }
 
-// PASS для БД BeginTransaction
+// BeginTransaction - PASS для БД.
 func (m *MemoryStorage) BeginTransaction() (storage.TransactionStorage, error) {
 	return nil, errors.New("transaction is not in MemoryStorage")
 }
 
-// PASS для БД SaveURLTx
+// SaveURLTx - PASS для БД.
 func (m *MemoryStorage) SaveURLTx(id, shortURL, originalURL string) (string, error) {
 	//return m.SaveURL(id, shortURL, originalURL)
 	return "", errors.New("transactions are not supported in MemoryStorage")
 }
 
-// PASS Commit
+// Commit - PASS.
 func (m *MemoryTransaction) Commit() error {
 	return errors.New("transactions are not supported in MemoryStorage")
 }
 
-// PASS Rollback
+// Rollback - PASS.
 func (m *MemoryTransaction) Rollback() error {
 	return errors.New("transactions are not supported in MemoryStorage")
 }
 
-// PASS URLsForDelete
+// DeleteURLS - PASS URLsForDelete.
 func (m *MemoryStorage) DeleteURLS(userID string, urlsTodelete []string) error {
 	return errors.New("delete URLs for user are not supported in MemoryStorage")
 }
 
-// PASS GetUserURLS
+// GetUserURLS - PASS.
 func (m *MemoryStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	return nil, errors.New("get URLs for user are not supported in MemoryStorage")
 }

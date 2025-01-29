@@ -10,7 +10,7 @@ var (
 	ErrURLNotFound      = errors.New("URL not found")
 )
 
-// Storage для всех типов хранилищ
+// Storage для всех типов хранилищ.
 type Storage interface {
 	SaveURL(id, shortURL, originalURL, userID string) (string, error)
 	GetURL(shortURL string) (string, error)
@@ -19,13 +19,14 @@ type Storage interface {
 	DeleteURLS(userID string, urlsTodelete []string) error
 }
 
-// для операций внутри транзакций
+// TransactionStorage для операций внутри транзакций.
 type TransactionStorage interface {
 	SaveURLTx(id, shortURL, originalURL, userID string) (string, error)
 	Commit() error
 	Rollback() error
 }
 
+// UserURLS структура для URLs&
 type UserURLS struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`

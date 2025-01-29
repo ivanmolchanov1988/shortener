@@ -23,6 +23,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Config - конфиг.
 type Config struct {
 	Address         string
 	BaseURL         string
@@ -35,6 +36,7 @@ type Config struct {
 	TimeToExpire int
 }
 
+// FlagsConfig - флаги
 type FlagsConfig struct {
 	Address  string
 	BaseURL  string
@@ -60,6 +62,7 @@ var baseDSN = struct {
 	sslmode:  "disable",
 }
 
+// Usage - начальное логирование.
 func Usage() {
 	var version = "0.0.1"
 
@@ -116,6 +119,7 @@ func getFlags() FlagsConfig {
 	}
 }
 
+// InitConfigAndPrepareStorage подготавливает конфигурацию и хранилище.
 func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	fmt.Println("Initializing configuration and preparing storage...")
 	cfg, err := InitConfig()
@@ -197,7 +201,6 @@ func copyMigrations(srcDir, dstDir string) error {
 	return nil
 }
 
-// func initializeDatabase(db *sql.DB) error {
 func initializeDatabase(dbDSN string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbDSN)
 	if db == nil || err != nil {
@@ -276,6 +279,7 @@ func initializeFileStorage(filePath string) (*filestore.FileStorage, error) {
 	return store, nil
 }
 
+// InitConfig подготавливает конфиг.
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
@@ -304,6 +308,7 @@ func InitConfig() (*Config, error) {
 
 }
 
+// CreateDirectories создаёт каталоги, хз для чего, не помню, 5 часов утра.
 func CreateDirectories(filePath string) error {
 	dir := filepath.Dir(filePath)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -321,7 +326,7 @@ func CreateDirectories(filePath string) error {
 	return nil
 }
 
-// Проверяем наличие файла и создаем его, если он отсутствует
+// CreateFileIfNotExist - Проверяем наличие файла и создаем его, если он отсутствует.
 func CreateFileIfNotExist(filePath string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		fmt.Printf("File does not exist, creating: %v\n", filePath)
