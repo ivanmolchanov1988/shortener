@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
@@ -283,26 +281,26 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// go func() {
-	// 	if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
-	// 		log.Printf("Failed to delete URLs for user %s: %v", userID, err)
-	// 	}
-	// }()
-	// --- Стоит добавить таймаут для асинхронных операций ---
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	go func(ctx context.Context) {
-		select {
-		case <-ctx.Done():
-			log.Printf("Timeout reached for deleting URLs for user %s", userID)
-			return
-		default:
-			if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
-				log.Printf("Failed to delete URLs for user %s: %v", userID, err)
-			}
+	go func() {
+		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
+			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
 		}
-	}(ctx)
+	}()
+	// --- Стоит добавить таймаут для асинхронных операций --- НЕ ПРОХОДИТ ТЕСТЫ iter15 !!!
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// defer cancel()
+
+	// go func(ctx context.Context) {
+	// 	select {
+	// 	case <-ctx.Done():
+	// 		log.Printf("Timeout reached for deleting URLs for user %s", userID)
+	// 		return
+	// 	default:
+	// 		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
+	// 			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
+	// 		}
+	// 	}
+	// }(ctx)
 
 	res.WriteHeader(http.StatusAccepted)
 }
