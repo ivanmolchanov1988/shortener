@@ -9,8 +9,8 @@ import (
 
 // readRequestBody читает тело запроса с поддержкой GZIP.
 func readRequestBody(req *http.Request) ([]byte, error) {
-	var body []byte
-	var err error
+	// var body []byte
+	// var err error
 
 	if req.Header.Get("Content-Encoding") == "gzip" {
 		gz, err := gzip.NewReader(req.Body)
@@ -18,9 +18,17 @@ func readRequestBody(req *http.Request) ([]byte, error) {
 			return nil, err
 		}
 		defer gz.Close()
-		body, err = io.ReadAll(gz)
-	} else {
-		body, err = io.ReadAll(req.Body)
+
+		body, err := io.ReadAll(gz)
+		if err != nil {
+			return nil, err
+		}
+		return body, nil
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
 	}
 
 	return body, err
