@@ -9,6 +9,7 @@ import (
 
 var allowedChars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
 
+// RandStr генерирует рандомную строку.
 func RandStr(n int) (string, error) {
 	b := make([]rune, n)
 	for i := range b {
@@ -18,9 +19,11 @@ func RandStr(n int) (string, error) {
 		}
 		b[i] = allowedChars[num.Int64()]
 	}
+
 	return string(b), nil
 }
 
+// GenUUID возвращает UID как строку.
 func GenUUID() string {
 	newUUID := uuid.New()
 	return newUUID.String()
