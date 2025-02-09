@@ -27,8 +27,8 @@ func writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	http.Error(w, message, statusCode)
 }
 
-// GetUserIDFromCookie получает UserID из куков
-func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, createIfMissing bool) (string, error) {
+// getUserIDFromCookie получает UserID из куков
+func getUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, createIfMissing bool) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
 		if createIfMissing {
@@ -50,7 +50,7 @@ func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, 
 	return userID, nil
 }
 
-// GetPingDB - get для проверки ping.
+// GetPingDB -  DB ping
 func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 	dbDSN := h.config.DatabaseDsn
 	db, err := sql.Open("postgres", dbDSN)

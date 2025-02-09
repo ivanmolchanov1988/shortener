@@ -54,7 +54,7 @@ func (h *Handler) processBatch(requestData []struct {
 		}
 
 		// Получаем userID из куки
-		userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
+		userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching user ID")
 		}
