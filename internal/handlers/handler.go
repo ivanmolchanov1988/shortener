@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ivanmolchanov1988/shortener/internal/postgres"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
@@ -231,35 +230,13 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
-		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
-			// Если НЕ Postgres, создаём куку перед возвратом 204
-			newUserID, createErr := GetUserIDFromCookie(w, r, h.config.Secret, true)
-			if createErr != nil {
-				writeErrorResponse(w, http.StatusInternalServerError, "Failed to create session")
-				return
-			}
-
-			log.Println("Создан новый userID для файлового хранилища:", newUserID)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		// Если Postgres, то возвращаем 401
 		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
-		//w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	// Получение URLs пользователя
 	urls, err := h.storage.GetUserURLS(userID)
 	if err != nil {
-		// Если URLs нет, отправляем HTTP 204
-		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
-			// Если НЕ Postgres, просто возвращаем 204 No Content
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to get user URLs")
 		return
 	}

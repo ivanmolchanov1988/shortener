@@ -4,7 +4,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -22,7 +21,6 @@ func buildJWTString(secret string, userID string, duration time.Duration) (strin
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		log.Println("!!! Ошибка подписания JWT:", err)
 		return "", fmt.Errorf("failed to build a token: %w", err)
 	}
 
@@ -31,8 +29,6 @@ func buildJWTString(secret string, userID string, duration time.Duration) (strin
 
 // GetUserID получает и валедирует User ID.
 func GetUserID(secret string, tokenString string) (string, error) {
-
-	log.Println("!!! Проверяем JWT:", tokenString)
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims,
@@ -44,12 +40,10 @@ func GetUserID(secret string, tokenString string) (string, error) {
 		})
 
 	if err != nil {
-		log.Println("!!!  Ошибка парсинга токена:", err)
 		return "", err
 	}
 
 	if !token.Valid {
-		log.Println("!!! Ошибка: токен недействителен")
 		return "", errors.New("invalid token")
 	}
 

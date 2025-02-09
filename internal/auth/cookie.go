@@ -2,7 +2,6 @@
 package auth
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -32,7 +31,6 @@ func setTokenCookie(w http.ResponseWriter, token string, duration time.Duration)
 func GetTokenFromCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
-		log.Println("!!! Ошибка: не найден session_token в куках")
 		return "", err
 	}
 
