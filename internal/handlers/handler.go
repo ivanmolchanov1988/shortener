@@ -232,13 +232,21 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
 		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
-			// Если НЕ Postgres, просто возвращаем 204 No Content
+			// Если НЕ Postgres, создаём куку перед возвратом 204
+			newUserID, createErr := GetUserIDFromCookie(w, r, h.config.Secret, true)
+			if createErr != nil {
+				writeErrorResponse(w, http.StatusInternalServerError, "Failed to create session")
+				return
+			}
+
+			log.Println("Создан новый userID для файлового хранилища:", newUserID)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
-		//writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
-		w.WriteHeader(http.StatusNoContent)
+		// Если Postgres, то возвращаем 401
+		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		//w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
