@@ -237,6 +237,12 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	// Получение URLs пользователя
 	urls, err := h.storage.GetUserURLS(userID)
 	if err != nil {
+		// Если URLs нет, отправляем HTTP 204
+		if len(urls) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to get user URLs")
 		return
 	}
