@@ -1,3 +1,4 @@
+// Package postgres содержит реализацию хранения данных в PostgreSQL.
 package postgres
 
 import (

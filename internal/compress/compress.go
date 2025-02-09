@@ -1,3 +1,4 @@
+// Package compress предоставляет утилиты для сжатия и разжатия данных с использованием GZIP.
 package compress
 
 import (

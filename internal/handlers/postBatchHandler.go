@@ -1,3 +1,4 @@
+// Package handlers реализует обработку пакетных (batch) HTTP-запросов для массового сокращения ссылок.
 package handlers
 
 import (

@@ -1,3 +1,4 @@
+// Package server управляет инициализацией конфигурации и запуском HTTP-сервера.
 package server
 
 import (

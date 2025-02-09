@@ -1,3 +1,4 @@
+// Package handlers определяет основной HTTP-хендлер, управляющий запросами к сервису сокращения ссылок.
 package handlers
 
 import (
@@ -20,7 +21,7 @@ type Handler struct {
 	config  *server.Config
 }
 
-// Создание нового Handler.
+// NewHandler - создание нового Handler.
 func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
 	if cfg == nil {
 		panic("can't be nil for cfg")

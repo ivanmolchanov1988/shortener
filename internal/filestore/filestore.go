@@ -1,3 +1,4 @@
+// Package filestore реализует файловое хранилище для сохранения и загрузки URL-адресов.
 package filestore
 
 import (

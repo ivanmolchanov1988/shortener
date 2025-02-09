@@ -1,3 +1,4 @@
+// Package handlers содержит вспомогательные функции для обработки HTTP-запросов и ответов.
 package handlers
 
 import (
@@ -49,7 +50,7 @@ func getUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, 
 	return userID, nil
 }
 
-// DB ping
+// GetPingDB - get для проверки ping.
 func (h *Handler) GetPingDB(res http.ResponseWriter, req *http.Request) {
 	dbDSN := h.config.DatabaseDsn
 	db, err := sql.Open("postgres", dbDSN)

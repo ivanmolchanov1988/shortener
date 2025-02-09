@@ -1,18 +1,19 @@
+// Package memory реализует хранение данных в памяти (in-memory storage) для работы сервиса без базы данных.
 package memory
 
 import (
 	"errors"
 	"sync"
 
-	"github.com/ivanmolchanov1988/shortener/internal/filestore"
+	//"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
 // MemoryStorage - структура для хранения данных в памяти.
 type MemoryStorage struct {
-	data        map[string]string
-	fileStorage *filestore.FileStorage
-	mu          sync.RWMutex
+	data map[string]string
+	//fileStorage *filestore.FileStorage
+	mu sync.RWMutex
 }
 
 // NewMemoryStorage возвращает мапу MemoryStorage.
@@ -22,7 +23,7 @@ func NewMemoryStorage() *MemoryStorage {
 	}
 }
 
-// PASS transaction
+// MemoryTransaction - PASS transaction
 type MemoryTransaction struct{}
 
 // SaveURL сохраняет URLs в MemoryStorage.

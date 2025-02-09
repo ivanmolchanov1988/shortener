@@ -1,3 +1,4 @@
+// Package handlers содержит обработчики HTTP-запросов для работы с сервисом сокращения ссылок.
 package handlers
 
 import (

@@ -1,3 +1,4 @@
+// Package handlers реализует хендлер для сокращения URL с использованием JSON API.
 package handlers
 
 import (

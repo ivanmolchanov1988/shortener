@@ -1,3 +1,4 @@
+// Package handlers содержит хендлеры для обработки HTTP-запросов по созданию коротких ссылок.
 package handlers
 
 import (
