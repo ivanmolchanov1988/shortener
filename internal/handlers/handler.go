@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/internal/postgres"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
@@ -230,6 +231,12 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := GetUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
+		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
+			// Если НЕ Postgres, просто возвращаем 204 No Content
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
@@ -238,7 +245,8 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	urls, err := h.storage.GetUserURLS(userID)
 	if err != nil {
 		// Если URLs нет, отправляем HTTP 204
-		if len(urls) == 0 {
+		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
+			// Если НЕ Postgres, просто возвращаем 204 No Content
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
