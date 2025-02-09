@@ -229,15 +229,18 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 
 // GetUserURLS обрабатывает запрос GET вида http://{server}/api/user/urls и возвращает массив с short и original urls.
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
+	var userID string
 	userID, err := getUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
-		// newUserID, createErr - Создаём куку независимо от типа хранилища
-		newUserID, err := getUserIDFromCookie(w, r, h.config.Secret, true)
+		// Создаём новую куку для пользователя
+		userID, err = getUserIDFromCookie(w, r, h.config.Secret, true)
 		if err != nil {
 			writeErrorResponse(w, http.StatusInternalServerError, "Failed to create session")
 			return
 		}
-		userID = newUserID
+
+		// PASS userID
+		fmt.Printf("New user created: %s\n", userID)
 
 		// Возвращаем 204 No Content, так как это новый пользователь без ссылок
 		w.WriteHeader(http.StatusNoContent)
