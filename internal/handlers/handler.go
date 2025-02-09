@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/internal/postgres"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/ivanmolchanov1988/shortener/pkg/utils"
@@ -230,8 +231,21 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	userID, err := getUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
-		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
-		return
+		// Если БД НЕ используется (например, файловое хранилище), создаём куку
+		if _, ok := h.storage.(*postgres.PostgresStorage); !ok {
+			newUserID, createErr := getUserIDFromCookie(w, r, h.config.Secret, true)
+			if createErr != nil {
+				writeErrorResponse(w, http.StatusInternalServerError, "Failed to create session")
+				return
+			}
+			userID = newUserID
+		} else {
+			// Если БД используется, возвращаем 401 (без куки)
+			writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		// writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		// return
 	}
 
 	// Получение URLs пользователя
