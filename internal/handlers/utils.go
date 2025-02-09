@@ -27,8 +27,8 @@ func writeErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	http.Error(w, message, statusCode)
 }
 
-// getUserIDFromCookie получает UserID из куков
-func getUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, createIfMissing bool) (string, error) {
+// GetUserIDFromCookie получает UserID из куков
+func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request, secret string, createIfMissing bool) (string, error) {
 	tokenString, err := auth.GetTokenFromCookie(r)
 	if err != nil {
 		if createIfMissing {

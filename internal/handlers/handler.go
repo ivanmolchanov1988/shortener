@@ -70,7 +70,7 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	// Сохраним URL.
 	id := utils.GenUUID()
 
-	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
 		writeErrorResponse(res, http.StatusInternalServerError, "Error fetching user ID")
 		return
@@ -178,7 +178,7 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Получаем userID из куки
-	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
 		http.Error(res, "Error fetching user ID", http.StatusInternalServerError)
 		return
@@ -228,7 +228,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 
 // GetUserURLS обрабатывает запрос GET вида http://{server}/api/user/urls и возвращает массив с short и original urls.
 func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
-	userID, err := getUserIDFromCookie(w, r, h.config.Secret, false)
+	userID, err := GetUserIDFromCookie(w, r, h.config.Secret, false)
 	if err != nil {
 		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
 		return
@@ -264,7 +264,7 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userID, err := getUserIDFromCookie(res, req, h.config.Secret, false)
+	userID, err := GetUserIDFromCookie(res, req, h.config.Secret, false)
 	if err != nil {
 		writeErrorResponse(res, http.StatusUnauthorized, "Unauthorized for delete")
 		return
