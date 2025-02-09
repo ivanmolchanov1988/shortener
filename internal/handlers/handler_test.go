@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/require"
@@ -29,7 +28,7 @@ func init() {
 	flag.CommandLine = flag.NewFlagSet("", flag.ExitOnError)
 }
 
-func TestPostUrl(t *testing.T) {
+func TestPostURL(t *testing.T) {
 
 	tests := []struct { // мне надо передать: контент, тело. Жду: код, ответ, контент
 		name        string
@@ -101,12 +100,7 @@ func TestPostUrl(t *testing.T) {
 		},
 	}
 
-	//memStore := memory.NewMemoryStorage()
-	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewStorage(fStore)
-	if err != nil {
-		t.Errorf("Error for memStore %v", err)
-	}
+	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,12 +157,7 @@ func TestPostUrl(t *testing.T) {
 }
 
 func TestShorten(t *testing.T) {
-	//memStore := memory.NewMemoryStorage()
-	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewStorage(fStore)
-	if err != nil {
-		t.Errorf("Error for memStore %v", err)
-	}
+	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
 
 	urlToSend := `{"url":"https://example.com"}`
@@ -230,20 +219,18 @@ func TestShorten(t *testing.T) {
 	}
 }
 
-func TestGetUrl(t *testing.T) {
+func TestGetURL(t *testing.T) {
 
 	//запись для тестов
 	testShortURL := "testURL"
 	invalidShortURL := "123321"
+	id := "Qwerty"
+	testUserID := "123333"
 
-	fStore := filestore.NewFileStorage(cfg.FileStoragePath)
-	memStore, err := memory.NewStorage(fStore)
-	if err != nil {
-		t.Errorf("Error for memStore %v", err)
-	}
+	memStore := memory.NewMemoryStorage()
 	handler := NewHandler(memStore, cfg)
 
-	if err := memStore.SaveURL(testShortURL, "https://testURL123.ru"); err != nil {
+	if _, err := memStore.SaveURL(id, testShortURL, "https://testURL123.ru", testUserID); err != nil {
 		require.NoError(t, err)
 	}
 

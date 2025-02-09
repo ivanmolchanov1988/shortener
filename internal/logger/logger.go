@@ -1,3 +1,4 @@
+// Package logger предоставляет инструменты для логирования событий в сервисе сокращения ссылок.
 package logger
 
 import (
@@ -13,10 +14,13 @@ type loggingResponseWriter struct {
 	size       int
 }
 
+// WriteHeader записывает статус-код HTTP-ответа.
 func (lw *loggingResponseWriter) WriteHeader(statusCode int) {
 	lw.statusCode = statusCode
 	lw.ResponseWriter.WriteHeader(statusCode)
 }
+
+// Write записывает данные в HTTP-ответ через ResponseWriter.
 func (lw *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := lw.ResponseWriter.Write(b)
 	lw.size += size
@@ -25,6 +29,7 @@ func (lw *loggingResponseWriter) Write(b []byte) (int, error) {
 
 var log *zap.Logger = zap.NewNop() //Log как глобальная - не рекомендуется, подумать как передать
 
+// Initialize преобразуем текстовый уровень логирования в zap.AtomicLevel и устанавливаем синглтон.
 func Initialize(level string) error {
 	// преобразуем текстовый уровень логирования в zap.AtomicLevel
 	lvl, err := zap.ParseAtomicLevel(level)
