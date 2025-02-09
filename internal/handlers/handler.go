@@ -237,7 +237,8 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		//writeErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
