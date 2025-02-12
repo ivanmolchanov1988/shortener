@@ -5,23 +5,22 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/ivanmolchanov1988/shortener/internal/filestore"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	postgr "github.com/ivanmolchanov1988/shortener/internal/postgres"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 
-	"database/sql"
-
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+)
+
+// Переменные для stdout
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 // Config - конфиг.
@@ -65,10 +64,17 @@ var baseDSN = struct {
 
 // Usage - начальное логирование.
 func Usage() {
-	var version = "0.0.1"
+	//fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
 
-	fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
-	fmt.Fprintf(flag.CommandLine.Output(), "Version: %s\n\n ", version)
+	// Для примера
+	// go run -ldflags="-X 'github.com/ivanmolchanov1988/shortener/internal/server.buildVersion=1.2.3' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildDate=2025-02-10' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildCommit=abcdefg'" main.go
+	setDefaultNA(&buildVersion, "N/A")
+	setDefaultNA(&buildDate, "N/A")
+	setDefaultNA(&buildCommit, "N/A")
+	fmt.Fprintf(flag.CommandLine.Output(), "Build version: %s\n\r", buildVersion)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build date: %s\n\r", buildDate)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build commit: %s\n\n\r", buildCommit)
+
 	flag.PrintDefaults()
 }
 
@@ -167,119 +173,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	}
 }
 
-// Для автотестов Яндекса
-func copyMigrations(srcDir, dstDir string) error {
-	files, err := os.ReadDir(srcDir)
-	if err != nil {
-		return fmt.Errorf("failed to read source migrations directory: %v", err)
-	}
-	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create destination migrations directory: %v", err)
-		}
-	}
-	for _, file := range files {
-		srcFilePath := filepath.Join(srcDir, file.Name())
-		dstFilePath := filepath.Join(dstDir, file.Name())
-
-		srcFile, err := os.Open(srcFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to open source file: %v", err)
-		}
-		defer srcFile.Close()
-
-		dstFile, err := os.Create(dstFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to create destination file: %v", err)
-		}
-		defer dstFile.Close()
-
-		if _, err := io.Copy(dstFile, srcFile); err != nil {
-			return fmt.Errorf("failed to copy file: %v", err)
-		}
-	}
-	return nil
-}
-
-func initializeDatabase(dbDSN string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dbDSN)
-	if db == nil || err != nil {
-		return nil, errors.New("db connection is nil or return erro")
-	}
-
-	// ----- Для автотестов
-	// Определение исходного и целевого путей для миграций
-	srcMigrationsPath := filepath.Join(getProjectRoot(), "internal/migrations")
-
-	// Определяем директорию запуска тестов
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %v", err)
-	}
-	dstMigrationsPath := filepath.Join(currentDir, "internal/migrations")
-
-	// Копируем миграции в нужную директорию, если они там отсутствуют
-	if _, err := os.Stat(dstMigrationsPath); os.IsNotExist(err) {
-		if err := copyMigrations(srcMigrationsPath, dstMigrationsPath); err != nil {
-			return nil, fmt.Errorf("failed to copy migrations: %v", err)
-		}
-	}
-	fmt.Printf("root project migrations folder: %v\n", srcMigrationsPath)
-	fmt.Printf("dst migrations folder: %v\n", dstMigrationsPath)
-	// -----
-
-	// миграции
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create migrate: %v", err)
-	}
-	rootPath := getShortRoot()
-	files, err := os.ReadDir(rootPath + "/internal/migrations")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read migrations directory: %v", err)
-	}
-	for _, file := range files {
-		log.Printf("found migration file: %s", file.Name())
-	}
-	m, err := migrate.NewWithDatabaseInstance(
-		//"file://"+rootPath+"/internal/migrations",
-		"file://"+dstMigrationsPath, // - ДЛЯ ЯНДЕКСА
-		baseDSN.dbname,
-		driver)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize migrate: %v", err)
-	}
-	//запуск миграции
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return nil, fmt.Errorf("failed to apply migrate: %v", err)
-	}
-	log.Println("Migration is complete!")
-
-	return db, nil
-}
-
-func initializeFileStorage(filePath string) (*filestore.FileStorage, error) {
-	fmt.Printf("Starting to initialize file storage at %s\n", filePath)
-
-	dirPath := filepath.Dir(filePath)
-	if err := CreateDirectories(dirPath); err != nil {
-		fmt.Printf("Failed to create directories for path %s: %v\n", dirPath, err)
-		return nil, err
-	}
-
-	if err := CreateFileIfNotExist(filePath); err != nil {
-		return nil, err
-	}
-
-	store, err := filestore.NewFileStorage(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return store, nil
-}
-
 // InitConfig подготавливает конфиг.
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
@@ -307,65 +200,4 @@ func InitConfig() (*Config, error) {
 		TimeToExpire: 3,
 	}, nil
 
-}
-
-// CreateDirectories создаёт каталоги, хз для чего, не помню, 5 часов утра.
-func CreateDirectories(filePath string) error {
-	dir := filepath.Dir(filePath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		fmt.Printf("Directory does not exist, creating: %v\n", dir)
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return fmt.Errorf("error creating directory: %w", err)
-		}
-		fmt.Printf("Directory created: %v\n", dir)
-	} else if err != nil {
-		return fmt.Errorf("error checking directory: %w", err)
-	} else {
-		fmt.Printf("Directory already exists: %v\n", dir)
-	}
-	return nil
-}
-
-// CreateFileIfNotExist - Проверяем наличие файла и создаем его, если он отсутствует.
-func CreateFileIfNotExist(filePath string) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("File does not exist, creating: %v\n", filePath)
-		file, err := os.Create(filePath)
-		if err != nil {
-			return fmt.Errorf("error creating file: %w", err)
-		}
-		file.Close()
-	} else if err != nil {
-		return fmt.Errorf("error checking file: %w", err)
-	} else {
-		fmt.Printf("File already exists: %v\n", filePath)
-	}
-	return nil
-}
-
-/// help funcs - вынести из server
-
-func getProjectRoot() string {
-	// Используем текущий рабочий каталог как корневой каталог
-	dir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error getting current directory:", err)
-		return ""
-	}
-	return dir
-}
-func getDefaultFilePath() string {
-	projectRoot := getProjectRoot()
-	newPath := filepath.Join(projectRoot, "urls.json")
-	return newPath
-}
-func getShortRoot() string {
-	var fullRoot = getProjectRoot()
-	index := strings.Index(fullRoot, "/cmd/shortener")
-	if index == -1 {
-		fmt.Println("Failed to find ShortRoot")
-		return fullRoot
-	}
-	return fullRoot[:index]
 }

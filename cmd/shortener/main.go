@@ -25,6 +25,7 @@ import (
 // goimports - nothing to commit, working tree clean
 
 func main() {
+	server.Usage()
 	go func() {
 		log.Println("Starting pprof server on localhost:6060")
 		log.Println(http.ListenAndServe("localhost:6060", nil)) // Сервер профилирования
