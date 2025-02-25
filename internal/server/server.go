@@ -34,6 +34,7 @@ type Config struct {
 	//user id
 	Secret       string
 	TimeToExpire int
+	EnableHTTPS  bool
 }
 
 // FlagsConfig - флаги
@@ -44,6 +45,8 @@ type FlagsConfig struct {
 	Logging  string
 	//db
 	DatabaseDsn string
+	//https
+	EnableHTTPS bool
 }
 
 var baseDSN = struct {
@@ -84,6 +87,7 @@ func getFlags() FlagsConfig {
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
 	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
 
 	flag.Parse()
 
@@ -92,6 +96,7 @@ func getFlags() FlagsConfig {
 	logging := os.Getenv("LOG_LVL")
 	filePath := os.Getenv("FILE_STORAGE_PATH")
 	dbDSN := os.Getenv("DATABASE_DSN")
+	enableHTTPS := os.Getenv("ENABLE_HTTPS")
 
 	if address == "" {
 		address = *tempAddress
@@ -116,6 +121,11 @@ func getFlags() FlagsConfig {
 	if logging == "" {
 		logging = *tempLogging
 	} // добать остальные уровни логирования...
+	if enableHTTPS == "" {
+		enableHTTPS = fmt.Sprintf("%v", *tempEnableHTTPS)
+	} else {
+		fmt.Printf("Using ENV(ENABLE_HTTPS) for HTTPS: %s\n", enableHTTPS)
+	}
 
 	return FlagsConfig{
 		Address:     address,
@@ -123,6 +133,7 @@ func getFlags() FlagsConfig {
 		FilePath:    filePath,
 		Logging:     logging,
 		DatabaseDsn: dbDSN,
+		EnableHTTPS: enableHTTPS == "true",
 	}
 }
 
@@ -185,8 +196,8 @@ func InitConfig() (*Config, error) {
 	}
 
 	// Логирование для отладки
-	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\n",
-		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn)
+	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %s\n",
+		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn, flags.EnableHTTPS)
 	///
 
 	return &Config{
@@ -198,6 +209,7 @@ func InitConfig() (*Config, error) {
 		DatabaseDsn:  flags.DatabaseDsn,
 		Secret:       "secret",
 		TimeToExpire: 3,
+		EnableHTTPS:  flags.EnableHTTPS,
 	}, nil
 
 }
