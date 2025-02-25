@@ -1,61 +1,83 @@
+// Package server управляет инициализацией конфигурации и запуском HTTP-сервера.
 package server
 
 import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
+
+	"github.com/ivanmolchanov1988/shortener/internal/memory"
+	postgr "github.com/ivanmolchanov1988/shortener/internal/postgres"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
+
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/lib/pq"
 )
 
+// Переменные для stdout
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+// Config - конфиг.
 type Config struct {
 	Address         string
 	BaseURL         string
 	Logging         string
 	FileStoragePath string
+	//db
+	DatabaseDsn string
+	//user id
+	Secret       string
+	TimeToExpire int
+	EnableHTTPS  bool
 }
 
+// FlagsConfig - флаги
 type FlagsConfig struct {
 	Address  string
 	BaseURL  string
 	FilePath string
 	Logging  string
+	//db
+	DatabaseDsn string
+	//https
+	EnableHTTPS bool
 }
 
-func CreateDirectories(filePath string) error {
-	dir := filepath.Dir(filePath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		fmt.Printf("Directory does not exist, creating: %v\n", dir)
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return fmt.Errorf("error creating directory: %w", err)
-		}
-	}
-	return nil
+var baseDSN = struct {
+	host     string
+	port     string
+	user     string
+	password string
+	dbname   string
+	sslmode  string
+}{
+	host:     "localhost",
+	port:     "5432",
+	user:     "postgres",
+	password: "password",
+	dbname:   "shortener",
+	sslmode:  "disable",
 }
 
-// Проверяем наличие файла и создаем его, если он отсутствует
-func CreateFileIfNotExist(filePath string) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("File does not exist, creating: %v\n", filePath)
-		file, err := os.Create(filePath)
-		if err != nil {
-			return fmt.Errorf("error creating file: %w", err)
-		}
-		file.Close()
-	} else if err != nil {
-		return fmt.Errorf("error checking file: %w", err)
-	} else {
-		fmt.Printf("File exists: %v\n", filePath)
-	}
-	return nil
-}
-
+// Usage - начальное логирование.
 func Usage() {
-	var version = "0.0.1"
+	//fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
 
-	fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
-	fmt.Fprintf(flag.CommandLine.Output(), "Version: %s\n\n ", version)
+	// Для примера
+	// go run -ldflags="-X 'github.com/ivanmolchanov1988/shortener/internal/server.buildVersion=1.2.3' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildDate=2025-02-10' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildCommit=abcdefg'" main.go
+	setDefaultNA(&buildVersion, "N/A")
+	setDefaultNA(&buildDate, "N/A")
+	setDefaultNA(&buildCommit, "N/A")
+	fmt.Fprintf(flag.CommandLine.Output(), "Build version: %s\n\r", buildVersion)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build date: %s\n\r", buildDate)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build commit: %s\n\n\r", buildCommit)
+
 	flag.PrintDefaults()
 }
 
@@ -64,6 +86,8 @@ func getFlags() FlagsConfig {
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
+	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
 
 	flag.Parse()
 
@@ -71,52 +95,96 @@ func getFlags() FlagsConfig {
 	baseURL := os.Getenv("BASE_URL")
 	logging := os.Getenv("LOG_LVL")
 	filePath := os.Getenv("FILE_STORAGE_PATH")
+	dbDSN := os.Getenv("DATABASE_DSN")
+	enableHTTPS := os.Getenv("ENABLE_HTTPS")
 
 	if address == "" {
 		address = *tempAddress
 	} else {
-		fmt.Printf("Using ENV for address: %s\n", address)
+		fmt.Printf("Using ENV(SERVER_ADDRESS) for address: %s\n", address)
 	}
 	if baseURL == "" {
 		baseURL = *tempBaseURL
 	} else {
-		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
+		fmt.Printf("Using ENV(BASE_URL) for baseURL: %s\n", baseURL)
 	}
 	if filePath == "" {
 		filePath = *tempFilePath
 	} else {
-		fmt.Printf("Using ENV for file path: %s\n", filePath)
+		fmt.Printf("Using ENV(FILE_STORAGE_PATH) for file path: %s\n", filePath)
+	}
+	if dbDSN == "" {
+		dbDSN = *tempDB
+	} else {
+		fmt.Printf("Using ENV(DATABASE_DSN) for addressDB: %s\n", dbDSN)
 	}
 	if logging == "" {
 		logging = *tempLogging
 	} // добать остальные уровни логирования...
+	if enableHTTPS == "" {
+		enableHTTPS = fmt.Sprintf("%v", *tempEnableHTTPS)
+	} else {
+		fmt.Printf("Using ENV(ENABLE_HTTPS) for HTTPS: %s\n", enableHTTPS)
+	}
 
 	return FlagsConfig{
-		Address:  address,
-		BaseURL:  baseURL,
-		FilePath: filePath,
-		Logging:  logging,
+		Address:     address,
+		BaseURL:     baseURL,
+		FilePath:    filePath,
+		Logging:     logging,
+		DatabaseDsn: dbDSN,
+		EnableHTTPS: enableHTTPS == "true",
 	}
 }
 
-func InitConfigAndPrepareStorage() (*Config, error) {
+// InitConfigAndPrepareStorage подготавливает конфигурацию и хранилище.
+func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
+	fmt.Println("Initializing configuration and preparing storage...")
 	cfg, err := InitConfig()
 	if err != nil {
-		return nil, err
+		log.Printf("Config is failed: %v\n", err)
+		return nil, nil, fmt.Errorf("config initialization failed: %w", err)
+	}
+	fmt.Printf("Loaded configuration: %+v\n", cfg)
+	if cfg == nil {
+		log.Println("Config is nil")
 	}
 
-	// Создание директорий и файлов
-	if err := CreateDirectories(cfg.FileStoragePath); err != nil {
-		return nil, err
-	}
+	var store storage.Storage
 
-	if err := CreateFileIfNotExist(cfg.FileStoragePath); err != nil {
-		return nil, err
-	}
+	// Определение типа хранилища
+	if cfg != nil {
+		switch {
+		case cfg.DatabaseDsn != "":
+			db, err := initializeDatabase(cfg.DatabaseDsn)
+			if err != nil {
+				log.Printf("Database initialization failed, switching to memory storage: %v", err)
+				store = memory.NewMemoryStorage()
+			} else {
+				store, err = postgr.NewPostgresStorage(db)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+				}
+				log.Println("Storage initialized with Postgre")
+			}
+		case cfg.FileStoragePath != "":
+			store, err = initializeFileStorage(cfg.FileStoragePath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
+			}
+			log.Println("Storage initialized with file storage")
+		default:
+			store = memory.NewMemoryStorage()
+			log.Println("Using mem storage")
+		}
 
-	return cfg, nil
+		return cfg, store, nil
+	} else {
+		return nil, nil, fmt.Errorf("failed from config: %w", err)
+	}
 }
 
+// InitConfig подготавливает конфиг.
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
@@ -127,26 +195,21 @@ func InitConfig() (*Config, error) {
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
+	// Логирование для отладки
+	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\n",
+		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn, flags.EnableHTTPS)
+	///
+
 	return &Config{
 		Address:         flags.Address,
 		BaseURL:         flags.BaseURL,
 		Logging:         flags.Logging,
 		FileStoragePath: flags.FilePath,
+		//db
+		DatabaseDsn:  flags.DatabaseDsn,
+		Secret:       "secret",
+		TimeToExpire: 3,
+		EnableHTTPS:  flags.EnableHTTPS,
 	}, nil
 
-}
-
-func getProjectRoot() string {
-	// Используем текущий рабочий каталог как корневой каталог
-	dir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error getting current directory:", err)
-		return ""
-	}
-	return dir
-}
-func getDefaultFilePath() string {
-	projectRoot := getProjectRoot()
-	newPath := filepath.Join(projectRoot, "urls.json")
-	return newPath
 }
