@@ -196,7 +196,7 @@ func InitConfig() (*Config, error) {
 	}
 
 	// Логирование для отладки
-	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %s\n",
+	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\n",
 		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn, flags.EnableHTTPS)
 	///
 
