@@ -208,10 +208,10 @@ func InitConfig() (*Config, error) {
 
 	// для Яндекса
 	if address == "" {
-		address = "localhost:8082"
+		address = "localhost:8080"
 	}
 	if baseURL == "" {
-		baseURL = "http://localhost:8082"
+		baseURL = "http://localhost:8080"
 	}
 	if filePath == "" {
 		filePath = getDefaultFilePath()
