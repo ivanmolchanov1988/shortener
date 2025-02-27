@@ -172,35 +172,31 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	var store storage.Storage
 
 	// Определение типа хранилища
-	if cfg != nil {
-		switch {
-		case cfg.DatabaseDsn != "":
-			db, err := initializeDatabase(cfg.DatabaseDsn)
-			if err != nil {
-				log.Printf("Database initialization failed, switching to memory storage: %v", err)
-				store = memory.NewMemoryStorage()
-			} else {
-				store, err = postgr.NewPostgresStorage(db)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
-				}
-				log.Println("Storage initialized with Postgre")
-			}
-		case cfg.FileStoragePath != "":
-			store, err = initializeFileStorage(cfg.FileStoragePath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
-			}
-			log.Println("Storage initialized with file storage")
-		default:
+	switch {
+	case cfg.DatabaseDsn != "":
+		db, err := initializeDatabase(cfg.DatabaseDsn)
+		if err != nil {
+			log.Printf("Database initialization failed, switching to memory storage: %v", err)
 			store = memory.NewMemoryStorage()
-			log.Println("Using mem storage")
+		} else {
+			store, err = postgr.NewPostgresStorage(db)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+			}
+			log.Println("Storage initialized with Postgre")
 		}
-
-		return cfg, store, nil
-	} else {
-		return nil, nil, fmt.Errorf("failed from config: %w", err)
+	case cfg.FileStoragePath != "":
+		store, err = initializeFileStorage(cfg.FileStoragePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
+		}
+		log.Println("Storage initialized with file storage")
+	default:
+		store = memory.NewMemoryStorage()
+		log.Println("Using mem storage")
 	}
+
+	return cfg, store, nil
 }
 
 // InitConfig подготавливает конфиг.
