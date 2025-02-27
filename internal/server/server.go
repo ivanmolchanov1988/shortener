@@ -176,7 +176,7 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	case cfg.DatabaseDsn != "":
 		db, err := initializeDatabase(cfg.DatabaseDsn)
 		if cfg.DatabaseDsn == "" {
-			return nil, nil, errors.New("Database DSN is empty")
+			return nil, nil, errors.New("database DSN is empty")
 		}
 		if err != nil {
 			log.Printf("Database initialization failed, switching to memory storage: %v", err)
