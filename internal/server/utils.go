@@ -113,3 +113,28 @@ func getShortRoot() string {
 	}
 	return fullRoot[:index]
 }
+
+// firstNonEmpty - выбирает первое непустое значение.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// firstNonEmptyBool - выбирает первое значение bool, если оно задано.
+func firstNonEmptyBool(values ...bool) bool {
+	for _, v := range values {
+		if v {
+			return v
+		}
+	}
+	return false
+}
+
+// parseBool - преобразует строку в bool.
+func parseBool(value string) bool {
+	return value == "true"
+}

@@ -46,7 +46,8 @@ type FlagsConfig struct {
 	//db
 	DatabaseDsn string
 	//https
-	EnableHTTPS bool
+	EnableHTTPS    bool
+	ConfigFilePath string
 }
 
 var baseDSN = struct {
@@ -81,59 +82,76 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
-func getFlags() FlagsConfig {
+func getFlags() (string, FlagsConfig) {
 	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
 	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
 	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
+	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
 
 	flag.Parse()
 
-	address := os.Getenv("SERVER_ADDRESS")
-	baseURL := os.Getenv("BASE_URL")
-	logging := os.Getenv("LOG_LVL")
-	filePath := os.Getenv("FILE_STORAGE_PATH")
-	dbDSN := os.Getenv("DATABASE_DSN")
-	enableHTTPS := os.Getenv("ENABLE_HTTPS")
+	// address := os.Getenv("SERVER_ADDRESS")
+	// baseURL := os.Getenv("BASE_URL")
+	// logging := os.Getenv("LOG_LVL")
+	// filePath := os.Getenv("FILE_STORAGE_PATH")
+	// dbDSN := os.Getenv("DATABASE_DSN")
+	// envHTTPS := os.Getenv("ENABLE_HTTPS")
+	// var enableHTTPS bool
+	// envConfigPath := os.Getenv("CONFIG")
 
-	if address == "" {
-		address = *tempAddress
-	} else {
-		fmt.Printf("Using ENV(SERVER_ADDRESS) for address: %s\n", address)
-	}
-	if baseURL == "" {
-		baseURL = *tempBaseURL
-	} else {
-		fmt.Printf("Using ENV(BASE_URL) for baseURL: %s\n", baseURL)
-	}
-	if filePath == "" {
-		filePath = *tempFilePath
-	} else {
-		fmt.Printf("Using ENV(FILE_STORAGE_PATH) for file path: %s\n", filePath)
-	}
-	if dbDSN == "" {
-		dbDSN = *tempDB
-	} else {
-		fmt.Printf("Using ENV(DATABASE_DSN) for addressDB: %s\n", dbDSN)
-	}
-	if logging == "" {
-		logging = *tempLogging
-	} // добать остальные уровни логирования...
-	if enableHTTPS == "" {
-		enableHTTPS = fmt.Sprintf("%v", *tempEnableHTTPS)
-	} else {
-		fmt.Printf("Using ENV(ENABLE_HTTPS) for HTTPS: %s\n", enableHTTPS)
-	}
+	// if address == "" {
+	// 	address = *tempAddress
+	// } else {
+	// 	fmt.Printf("Using ENV(SERVER_ADDRESS) for address: %s\n", address)
+	// }
+	// if baseURL == "" {
+	// 	baseURL = *tempBaseURL
+	// } else {
+	// 	fmt.Printf("Using ENV(BASE_URL) for baseURL: %s\n", baseURL)
+	// }
+	// if filePath == "" {
+	// 	filePath = *tempFilePath
+	// } else {
+	// 	fmt.Printf("Using ENV(FILE_STORAGE_PATH) for file path: %s\n", filePath)
+	// }
+	// if dbDSN == "" {
+	// 	dbDSN = *tempDB
+	// } else {
+	// 	fmt.Printf("Using ENV(DATABASE_DSN) for addressDB: %s\n", dbDSN)
+	// }
+	// if logging == "" {
+	// 	logging = *tempLogging
+	// } // добать остальные уровни логирования...
+	// if envHTTPS == "" {
+	// 	enableHTTPS = *tempEnableHTTPS
+	// } else {
+	// 	enableHTTPS = envHTTPS == "true"
+	// 	fmt.Printf("Using ENV(ENABLE_HTTPS) for HTTPS: %t\n", enableHTTPS)
+	// }
+	// if envConfigPath == "" {
 
-	return FlagsConfig{
-		Address:     address,
-		BaseURL:     baseURL,
-		FilePath:    filePath,
-		Logging:     logging,
-		DatabaseDsn: dbDSN,
-		EnableHTTPS: enableHTTPS == "true",
+	// }
+
+	// return FlagsConfig{
+	// 	Address:     address,
+	// 	BaseURL:     baseURL,
+	// 	FilePath:    filePath,
+	// 	Logging:     logging,
+	// 	DatabaseDsn: dbDSN,
+	// 	EnableHTTPS: enableHTTPS,
+	// 	ConfigFilePath: *tempConfigPath,
+	// }
+
+	return *tempConfigPath, FlagsConfig{
+		Address:     *tempAddress,
+		BaseURL:     *tempBaseURL,
+		FilePath:    *tempFilePath,
+		Logging:     *tempLogging,
+		DatabaseDsn: *tempDB,
+		EnableHTTPS: *tempEnableHTTPS,
 	}
 }
 
@@ -147,7 +165,8 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	}
 	fmt.Printf("Loaded configuration: %+v\n", cfg)
 	if cfg == nil {
-		log.Println("Config is nil")
+		// log.Println("Config is nil")
+		return nil, nil, errors.New("failed to initialize config")
 	}
 
 	var store storage.Storage
@@ -188,28 +207,49 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
-	flags := getFlags()
+	// flags := getFlags()
+	configPath, flags := getFlags()
+
+	// если flag не указан, пробуем ENV
+	if configPath == "" {
+		configPath = os.Getenv("CONFIG")
+	}
+
+	// теперь пробуем загрузить из файла
+	fileConfig, fileLoaded, err := loadConfig(configPath)
+	if err != nil {
+		log.Printf("Failed to load config from file: %v\n", err)
+		fileConfig = &Config{} // Если ошибка, используем пустой конфиг
+	}
+
+	// Flags > ENV > JSON
+	address := firstNonEmpty(flags.Address, os.Getenv("SERVER_ADDRESS"), fileConfig.Address)
+	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), fileConfig.BaseURL)
+	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), fileConfig.FileStoragePath)
+	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), fileConfig.Logging)
+	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), fileConfig.DatabaseDsn)
+	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
 
 	if flags.Address == "" || flags.BaseURL == "" {
-		flag.Usage()
+		Usage()
 		return nil, errors.New("the address or baseURL is empty")
 	}
 
 	// Логирование для отладки
-	log.Printf("Flags:\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\n",
-		flags.Address, flags.BaseURL, flags.FilePath, flags.Logging, flags.DatabaseDsn, flags.EnableHTTPS)
+	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\n",
+		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS)
 	///
 
 	return &Config{
-		Address:         flags.Address,
-		BaseURL:         flags.BaseURL,
-		Logging:         flags.Logging,
-		FileStoragePath: flags.FilePath,
+		Address:         address,
+		BaseURL:         baseURL,
+		Logging:         logging,
+		FileStoragePath: filePath,
 		//db
-		DatabaseDsn:  flags.DatabaseDsn,
+		DatabaseDsn:  dbDSN,
 		Secret:       "secret",
 		TimeToExpire: 3,
-		EnableHTTPS:  flags.EnableHTTPS,
+		EnableHTTPS:  enableHTTPS,
 	}, nil
 
 }
