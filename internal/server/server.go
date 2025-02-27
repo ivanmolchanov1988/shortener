@@ -87,10 +87,17 @@ func getDefaultFilePath() string {
 }
 
 func getFlags() (string, FlagsConfig) {
-	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
-	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+	// tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
+	// tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+	// tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
+	// tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
+	// tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	// tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
+	// tempConfigPath := flag.String("c", "", "path to config file in JSON format")
+	tempAddress := flag.String("a", "", "address to start the HTTP server")
+	tempBaseURL := flag.String("b", "", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
-	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
+	tempFilePath := flag.String("f", "", "file for urls data")
 	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
 	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
@@ -156,7 +163,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 // InitConfig подготавливает конфиг.
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
-
 	configPath, flags := getFlags()
 
 	// если flag не указан, пробуем ENV
@@ -195,10 +201,10 @@ func InitConfig() (*Config, error) {
 	// }
 	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
 
-	if flags.Address == "" || flags.BaseURL == "" {
-		Usage()
-		return nil, errors.New("the address or baseURL is empty")
-	}
+	// if flags.Address == "" || flags.BaseURL == "" {
+	// 	Usage()
+	// 	return nil, errors.New("the address or baseURL is empty")
+	// }
 
 	// для Яндекса
 	if address == "" {
