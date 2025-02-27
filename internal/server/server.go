@@ -68,7 +68,6 @@ var baseDSN = struct {
 
 // Usage - начальное логирование.
 func Usage() {
-	//fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
 
 	// Для примера
 	// go run -ldflags="-X 'github.com/ivanmolchanov1988/shortener/internal/server.buildVersion=1.2.3' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildDate=2025-02-10' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildCommit=abcdefg'" main.go
@@ -82,6 +81,11 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
+// Для Яндекса
+func getDefaultFilePath() string {
+	return "/tmp/shortener_config.json"
+}
+
 func getFlags() (string, FlagsConfig) {
 	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
 	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
@@ -92,58 +96,6 @@ func getFlags() (string, FlagsConfig) {
 	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
 
 	flag.Parse()
-
-	// address := os.Getenv("SERVER_ADDRESS")
-	// baseURL := os.Getenv("BASE_URL")
-	// logging := os.Getenv("LOG_LVL")
-	// filePath := os.Getenv("FILE_STORAGE_PATH")
-	// dbDSN := os.Getenv("DATABASE_DSN")
-	// envHTTPS := os.Getenv("ENABLE_HTTPS")
-	// var enableHTTPS bool
-	// envConfigPath := os.Getenv("CONFIG")
-
-	// if address == "" {
-	// 	address = *tempAddress
-	// } else {
-	// 	fmt.Printf("Using ENV(SERVER_ADDRESS) for address: %s\n", address)
-	// }
-	// if baseURL == "" {
-	// 	baseURL = *tempBaseURL
-	// } else {
-	// 	fmt.Printf("Using ENV(BASE_URL) for baseURL: %s\n", baseURL)
-	// }
-	// if filePath == "" {
-	// 	filePath = *tempFilePath
-	// } else {
-	// 	fmt.Printf("Using ENV(FILE_STORAGE_PATH) for file path: %s\n", filePath)
-	// }
-	// if dbDSN == "" {
-	// 	dbDSN = *tempDB
-	// } else {
-	// 	fmt.Printf("Using ENV(DATABASE_DSN) for addressDB: %s\n", dbDSN)
-	// }
-	// if logging == "" {
-	// 	logging = *tempLogging
-	// } // добать остальные уровни логирования...
-	// if envHTTPS == "" {
-	// 	enableHTTPS = *tempEnableHTTPS
-	// } else {
-	// 	enableHTTPS = envHTTPS == "true"
-	// 	fmt.Printf("Using ENV(ENABLE_HTTPS) for HTTPS: %t\n", enableHTTPS)
-	// }
-	// if envConfigPath == "" {
-
-	// }
-
-	// return FlagsConfig{
-	// 	Address:     address,
-	// 	BaseURL:     baseURL,
-	// 	FilePath:    filePath,
-	// 	Logging:     logging,
-	// 	DatabaseDsn: dbDSN,
-	// 	EnableHTTPS: enableHTTPS,
-	// 	ConfigFilePath: *tempConfigPath,
-	// }
 
 	return *tempConfigPath, FlagsConfig{
 		Address:     *tempAddress,
@@ -165,7 +117,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	}
 	fmt.Printf("Loaded configuration: %+v\n", cfg)
 	if cfg == nil {
-		// log.Println("Config is nil")
 		return nil, nil, errors.New("failed to initialize config")
 	}
 
@@ -206,7 +157,6 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
 
-	// flags := getFlags()
 	configPath, flags := getFlags()
 
 	// если flag не указан, пробуем ENV
@@ -227,26 +177,41 @@ func InitConfig() (*Config, error) {
 	}
 	// почему-то не понимает, что конфиг всегда есть
 	var localCfg Config
-	if fileConfig != nil {
-		localCfg = *fileConfig
-	} else {
-		localCfg = Config{}
-	}
+	// if fileConfig != nil {
+	// 	localCfg = *fileConfig
+	// } else {
+	// 	localCfg = Config{}
+	// }
 
 	// Flags > ENV > JSON
 	address := firstNonEmpty(flags.Address, os.Getenv("SERVER_ADDRESS"), localCfg.Address)
 	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), localCfg.BaseURL)
 	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), localCfg.FileStoragePath)
 	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), localCfg.Logging)
-	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"))
-	if fileConfig != nil {
-		dbDSN = firstNonEmpty(dbDSN, fileConfig.DatabaseDsn)
-	}
+	//dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"))
+	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), localCfg.DatabaseDsn)
+	// if fileConfig != nil {
+	// 	dbDSN = firstNonEmpty(dbDSN, fileConfig.DatabaseDsn)
+	// }
 	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
 
 	if flags.Address == "" || flags.BaseURL == "" {
 		Usage()
 		return nil, errors.New("the address or baseURL is empty")
+	}
+
+	// для Яндекса
+	if address == "" {
+		address = "localhost:8082"
+	}
+	if baseURL == "" {
+		baseURL = "http://localhost:8082"
+	}
+	if filePath == "" {
+		filePath = getDefaultFilePath()
+	}
+	if logging == "" {
+		logging = "info"
 	}
 
 	// Логирование для отладки

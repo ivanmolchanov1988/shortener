@@ -99,11 +99,12 @@ func getProjectRoot() string {
 	}
 	return dir
 }
-func getDefaultFilePath() string {
-	projectRoot := getProjectRoot()
-	newPath := filepath.Join(projectRoot, "urls.json")
-	return newPath
-}
+
+//	func getDefaultFilePath() string {
+//		projectRoot := getProjectRoot()
+//		newPath := filepath.Join(projectRoot, "urls.json")
+//		return newPath
+//	}
 func getShortRoot() string {
 	var fullRoot = getProjectRoot()
 	index := strings.Index(fullRoot, "/cmd/shortener")
