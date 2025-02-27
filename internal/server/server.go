@@ -175,6 +175,9 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	switch {
 	case cfg.DatabaseDsn != "":
 		db, err := initializeDatabase(cfg.DatabaseDsn)
+		if cfg.DatabaseDsn == "" {
+			return nil, nil, errors.New("Database DSN is empty")
+		}
 		if err != nil {
 			log.Printf("Database initialization failed, switching to memory storage: %v", err)
 			store = memory.NewMemoryStorage()
@@ -215,15 +218,30 @@ func InitConfig() (*Config, error) {
 	fileConfig, fileLoaded, err := loadConfig(configPath)
 	if err != nil {
 		log.Printf("Failed to load config from file: %v\n", err)
-		fileConfig = &Config{} // Если ошибка, используем пустой конфиг
+	}
+
+	// Если конфиг не загрузился, создаем пустой
+	if fileConfig == nil {
+		log.Println("Config file not loaded, using default empty config.")
+		fileConfig = &Config{}
+	}
+	// почему-то не понимает, что конфиг всегда есть
+	var localCfg Config
+	if fileConfig != nil {
+		localCfg = *fileConfig
+	} else {
+		localCfg = Config{}
 	}
 
 	// Flags > ENV > JSON
-	address := firstNonEmpty(flags.Address, os.Getenv("SERVER_ADDRESS"), fileConfig.Address)
-	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), fileConfig.BaseURL)
-	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), fileConfig.FileStoragePath)
-	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), fileConfig.Logging)
-	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), fileConfig.DatabaseDsn)
+	address := firstNonEmpty(flags.Address, os.Getenv("SERVER_ADDRESS"), localCfg.Address)
+	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), localCfg.BaseURL)
+	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), localCfg.FileStoragePath)
+	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), localCfg.Logging)
+	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"))
+	if fileConfig != nil {
+		dbDSN = firstNonEmpty(dbDSN, fileConfig.DatabaseDsn)
+	}
 	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
 
 	if flags.Address == "" || flags.BaseURL == "" {
