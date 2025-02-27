@@ -213,17 +213,55 @@ func (p *PostgresStorage) GetShortURLByOriginalURL(originalURL string) (string, 
 }
 
 // Close закрывает соединение.
+// func (p *PostgresStorage) Close() error {
+// 	if err := p.insertStmt.Close(); err != nil {
+// 		return err
+// 	}
+// 	if err := p.selectStmt.Close(); err != nil {
+// 		return err
+// 	}
+// 	if err := p.selectByOrig.Close(); err != nil {
+// 		return err
+// 	}
+// 	return p.db.Close()
+// }
+
+// Close закрывает соединение с БД и подготовленные SQL-стейтменты.
 func (p *PostgresStorage) Close() error {
-	if err := p.insertStmt.Close(); err != nil {
-		return err
+	var closeErrors []error
+
+	log.Println("Closing Postgres storage...")
+
+	// Закрываем подготовленные SQL-стейтменты
+	statements := []*sql.Stmt{
+		p.insertStmt,
+		p.selectStmt,
+		p.deleteSelectStmt,
+		p.selectByOrig,
+		p.selectUrlsFromUserID,
 	}
-	if err := p.selectStmt.Close(); err != nil {
-		return err
+
+	for _, stmt := range statements {
+		if stmt != nil {
+			if err := stmt.Close(); err != nil {
+				closeErrors = append(closeErrors, fmt.Errorf("failed to close statement: %w", err))
+			}
+		}
 	}
-	if err := p.selectByOrig.Close(); err != nil {
-		return err
+
+	// Закрываем соединение с БД
+	if p.db != nil {
+		if err := p.db.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("failed to close database: %w", err))
+		}
 	}
-	return p.db.Close()
+
+	if len(closeErrors) > 0 {
+		return fmt.Errorf("PostgresStorage close errors: %v", closeErrors)
+	}
+
+	log.Println("Postgres storage closed successfully")
+	return nil
 }
 
 // GetUserURLS возвращает все URLs текущего пользователя.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -13,6 +14,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -88,10 +91,13 @@ func generateCert() {
 
 func main() {
 	server.Usage()
-	go func() {
-		log.Println("Starting pprof server on localhost:6060")
-		log.Println(http.ListenAndServe("localhost:6060", nil)) // Сервер профилирования
-	}()
+
+	// Канал для перехвата системных сигналов
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	// Канал завершения
+	done := make(chan struct{})
 
 	cfg, store, err := server.InitConfigAndPrepareStorage()
 	if err != nil {
@@ -111,28 +117,90 @@ func main() {
 	// Хендлеры
 	r := setupHandlers(store, cfg)
 
+	// Создаём HTTP-сервер
+	srv := &http.Server{
+		Addr:              cfg.Address,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	// Старт
 	fmt.Printf("Server start: => %s\n\r", cfg.Address)
 
-	// HTTPS
-	// Проверка наличия сертификатов, если их нет — генерируем
-	if cfg.EnableHTTPS {
-		if _, err := os.Stat("certs/cert.pem"); os.IsNotExist(err) {
-			log.Println("Сертификаты не найдены, генерируем новые...")
-			generateCert()
+	// Запуск сервера в рутине
+	go func() {
+		if cfg.EnableHTTPS {
+			if _, err := os.Stat("certs/cert.pem"); os.IsNotExist(err) {
+				log.Println("Сертификаты не найдены, генерируем новые...")
+				generateCert()
+			}
+			// Запус с cert
+			log.Println("Запуск HTTPS сервера...")
+			if err := http.ListenAndServeTLS(cfg.Address, "certs/cert.pem", "certs/key.pem", r); err != nil {
+				fmt.Printf("Start with error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := http.ListenAndServe(cfg.Address, r); err != nil {
+				fmt.Printf("Start with error: %v\n", err)
+				os.Exit(1)
+			}
 		}
-		// Запус с cert
-		log.Println("Запуск HTTPS сервера...")
-		if err := http.ListenAndServeTLS(cfg.Address, "certs/cert.pem", "certs/key.pem", r); err != nil {
-			fmt.Printf("Start with error: %v\n", err)
-			os.Exit(1)
+	}()
+
+	// Сервер профилирования в рутине
+	// go func() {
+	// 	log.Println("Starting pprof server on localhost:6060")
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil)) // Сервер профилирования
+	// }()
+	pprofSrv := &http.Server{Addr: "localhost:6060"}
+	go func() {
+		log.Println("Starting pprof server on localhost:6060")
+		if err := pprofSrv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Printf("pprof server error: %v", err)
 		}
-	} else {
-		if err := http.ListenAndServe(cfg.Address, r); err != nil {
-			fmt.Printf("Start with error: %v\n", err)
-			os.Exit(1)
+	}()
+
+	// Горутина обработки сигналов
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received signal: %v. Shutting down...\n", sig)
+
+		// Создаём контекст с таймаутом для завершения работы
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Отключаем keep-alive, чтобы закрыть соединения
+		srv.SetKeepAlivesEnabled(false)
+
+		log.Println("Calling srv.Shutdown()...")
+		// Завершаем HTTP-сервер
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
 		}
-	}
+		log.Println("Server shutdown complete.")
+
+		// Закрываем pprof
+		log.Println("Shutting down pprof server...")
+		if err := pprofSrv.Shutdown(ctx); err != nil {
+			log.Printf("pprof Shutdown error: %v", err)
+		}
+
+		// Закрываем хранилище (если оно поддерживает закрытие)
+		if closer, ok := store.(storage.Closer); ok {
+			log.Println("Closing storage...")
+			if err := closer.Close(); err != nil {
+				log.Printf("Failed to close storage: %v", err)
+			}
+		}
+
+		log.Println("All services stopped.")
+		close(done) // Сообщаем, что сервер завершил работу
+	}()
+
+	// Ожидаем завершения сервера перед выходом
+	<-done
+	log.Println("Server gracefully stopped")
 
 }
 

@@ -33,3 +33,8 @@ type UserURLS struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
+
+// Closer описывает интерфейс для закрытия хранилища
+type Closer interface {
+	Close() error
+}
