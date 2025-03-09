@@ -19,6 +19,7 @@ type Storage interface {
 	BeginTransaction() (TransactionStorage, error)
 	GetUserURLS(userID string) ([]UserURLS, error)
 	DeleteURLS(userID string, urlsTodelete []string) error
+	GetStats() (Stats, error)
 }
 
 // TransactionStorage для операций внутри транзакций.
@@ -37,4 +38,10 @@ type UserURLS struct {
 // Closer описывает интерфейс для закрытия хранилища
 type Closer interface {
 	Close() error
+}
+
+// Stats структура для возврата статистики по кол-ву urls и users
+type Stats struct {
+	URLs  int
+	Users int
 }

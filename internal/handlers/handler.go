@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -317,4 +318,51 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 	// }(ctx)
 
 	res.WriteHeader(http.StatusAccepted)
+}
+
+// ///////// GET STATS ///////////
+
+// GetStats проверяем X-Real-IP и возвращает статистику по urls и users.
+func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+
+	// Проверяем, установлена ли доверенная подсеть
+	if h.config.TrustedSubnet == "" {
+		http.Error(w, "Access denied: no trusted subnet configured", http.StatusForbidden)
+		return
+	}
+
+	// Парсим доверенную подсеть
+	_, trustedNet, err := net.ParseCIDR(h.config.TrustedSubnet)
+	if err != nil {
+		http.Error(w, "Invalid trusted subnet configuration", http.StatusInternalServerError)
+		return
+	}
+
+	// Получаем IP клиента
+	clientIP, err := resolveClientIP(r)
+	if err != nil {
+		http.Error(w, "Failed to resolve client IP", http.StatusInternalServerError)
+		return
+	}
+
+	// Проверяем, входит ли клиентский IP в доверенную подсеть
+	if !trustedNet.Contains(clientIP) {
+		http.Error(w, "Access denied: unauthorized subnet", http.StatusForbidden)
+		return
+	}
+
+	// Получаем статистику
+	stats, err := h.storage.GetStats()
+	if err != nil {
+		http.Error(w, "Failed to retrieve statistics", http.StatusInternalServerError)
+		return
+	}
+
+	// Формируем и отправляем ответ
+	response := statsResponse{
+		URLs:  int(stats.URLs),
+		Users: int(stats.Users),
+	}
+
+	writeJSONResponse(w, http.StatusOK, response)
 }

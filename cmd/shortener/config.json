@@ -1,8 +1,8 @@
 {
-    "server_address": "localhost:8080", // аналог переменной окружения SERVER_ADDRESS или флага -a
-    "base_url": "http://localhost:8080", // аналог переменной окружения BASE_URL или флага -b
-    "logging": "info", // аналог уровня логирования
-    "file_storage_path": "/path/to/file.db", // аналог переменной окружения FILE_STORAGE_PATH или флага -f
-    "database_dsn": "", // аналог переменной окружения DATABASE_DSN или флага -d
-    "enable_https": true // аналог переменной окружения ENABLE_HTTPS или флага -s
+    "server_address": "localhost:8080",
+    "base_url": "http://localhost:8080",
+    "logging": "info",    "file_storage_path": "/path/to/file.db",
+    "database_dsn": "host=localhost port=5432 user=postgres password=password dbname=shortener sslmode=disable",
+    "enable_https": true,
+    "trusted_subnet": "192.168.1.0/24"
 } 

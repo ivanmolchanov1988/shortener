@@ -358,3 +358,19 @@ func (p *PostgresStorage) DeleteURLS(userID string, urlsToDelete []string) error
 	return nil
 
 }
+
+// GetStats возвращает все кол-во urls и users в Stats.
+func (p *PostgresStorage) GetStats() (storage.Stats, error) {
+	var stats storage.Stats
+	err := p.db.QueryRow(`
+		SELECT 
+			COUNT(DISTINCT short_url) AS urls, 
+			COUNT(DISTINCT user_id) AS users
+		FROM urls
+	`).Scan(&stats.URLs, &stats.Users)
+
+	if err != nil {
+		return storage.Stats{}, err
+	}
+	return stats, nil
+}

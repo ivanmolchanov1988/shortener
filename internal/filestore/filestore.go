@@ -141,3 +141,8 @@ func (f *FileStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 func (f *FileStorage) DeleteURLS(userID string, urlsTodelete []string) error {
 	return errors.New("delete URLs is not in FileStorage")
 }
+
+// GetStats - PASS.
+func (f *FileStorage) GetStats() (storage.Stats, error) {
+	return storage.Stats{}, errors.New("get stats is not supported in FileStorage")
+}

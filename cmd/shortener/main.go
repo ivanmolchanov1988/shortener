@@ -220,6 +220,7 @@ func setupHandlers(store storage.Storage, cfg *server.Config) http.Handler {
 	r.Post("/api/shorten/batch", handler.Batch)
 	r.Get("/api/user/urls", handler.GetUserURLS)
 	r.Delete("/api/user/urls", handler.DeleteURLS)
+	r.Get("/api/internal/stats", handler.GetStats)
 
 	return r
 }

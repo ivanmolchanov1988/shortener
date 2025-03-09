@@ -25,16 +25,17 @@ var (
 
 // Config - конфиг.
 type Config struct {
-	Address         string
-	BaseURL         string
-	Logging         string
-	FileStoragePath string
+	Address         string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	Logging         string `json:"logging"`
+	FileStoragePath string `json:"file_storage_path"`
 	//db
-	DatabaseDsn string
+	DatabaseDsn string `json:"database_dsn"`
 	//user id
-	Secret       string
-	TimeToExpire int
-	EnableHTTPS  bool
+	Secret        string
+	TimeToExpire  int
+	EnableHTTPS   bool   `json:"enable_https"`
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 // FlagsConfig - флаги
@@ -48,6 +49,7 @@ type FlagsConfig struct {
 	//https
 	EnableHTTPS    bool
 	ConfigFilePath string
+	TrustedSubnet  string
 }
 
 var baseDSN = struct {
@@ -94,16 +96,18 @@ func getFlags() (string, FlagsConfig) {
 	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
 	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
 	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
+	tempTrustedSubnet := flag.String("t", "", "trusted subnet for stat")
 
 	flag.Parse()
 
 	return *tempConfigPath, FlagsConfig{
-		Address:     *tempAddress,
-		BaseURL:     *tempBaseURL,
-		FilePath:    *tempFilePath,
-		Logging:     *tempLogging,
-		DatabaseDsn: *tempDB,
-		EnableHTTPS: *tempEnableHTTPS,
+		Address:       *tempAddress,
+		BaseURL:       *tempBaseURL,
+		FilePath:      *tempFilePath,
+		Logging:       *tempLogging,
+		DatabaseDsn:   *tempDB,
+		EnableHTTPS:   *tempEnableHTTPS,
+		TrustedSubnet: *tempTrustedSubnet,
 	}
 }
 
@@ -126,9 +130,9 @@ func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
 	switch {
 	case cfg.DatabaseDsn != "":
 		db, err := initializeDatabase(cfg.DatabaseDsn)
-		if cfg.DatabaseDsn == "" {
-			return nil, nil, errors.New("database DSN is empty")
-		}
+		// if cfg.DatabaseDsn == "" {
+		// 	return nil, nil, errors.New("database DSN is empty")
+		// }
 		if err != nil {
 			log.Printf("Database initialization failed, switching to memory storage: %v", err)
 			store = memory.NewMemoryStorage()
@@ -170,10 +174,12 @@ func InitConfig() (*Config, error) {
 	}
 
 	// Если конфиг не загрузился, создаем пустой
+	log.Printf("Trying to load config from: %s", configPath)
 	if fileConfig == nil {
 		log.Println("Config file not loaded, using default empty config.")
 		fileConfig = &Config{}
 	}
+	log.Printf("Loaded TrustedSubnet from JSON: %s", fileConfig.TrustedSubnet)
 	// почему-то не понимает, что конфиг всегда есть
 	var localCfg Config
 
@@ -182,8 +188,10 @@ func InitConfig() (*Config, error) {
 	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), localCfg.BaseURL)
 	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), localCfg.FileStoragePath)
 	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), localCfg.Logging)
-	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), localCfg.DatabaseDsn)
+	//dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), localCfg.DatabaseDsn)
+	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), fileConfig.DatabaseDsn)
 	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
+	trustedSubnet := firstNonEmpty(flags.TrustedSubnet, os.Getenv("TRUSTED_SUBNET"), fileConfig.TrustedSubnet)
 
 	// для Яндекса
 	if address == "" {
@@ -200,8 +208,8 @@ func InitConfig() (*Config, error) {
 	}
 
 	// Логирование для отладки
-	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\n",
-		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS)
+	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\nTrustedNet: %s\n",
+		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS, trustedSubnet)
 	///
 
 	return &Config{
@@ -210,10 +218,11 @@ func InitConfig() (*Config, error) {
 		Logging:         logging,
 		FileStoragePath: filePath,
 		//db
-		DatabaseDsn:  dbDSN,
-		Secret:       "secret",
-		TimeToExpire: 3,
-		EnableHTTPS:  enableHTTPS,
+		DatabaseDsn:   dbDSN,
+		Secret:        "secret",
+		TimeToExpire:  3,
+		EnableHTTPS:   enableHTTPS,
+		TrustedSubnet: trustedSubnet,
 	}, nil
 
 }

@@ -86,4 +86,9 @@ func (m *MemoryStorage) GetUserURLS(userID string) ([]storage.UserURLS, error) {
 	return nil, errors.New("get URLs for user are not supported in MemoryStorage")
 }
 
+// GetStats - PASS.
+func (m *MemoryStorage) GetStats() (storage.Stats, error) {
+	return storage.Stats{}, errors.New("get stats is not supported in MemoryStorage")
+}
+
 var _ storage.Storage = (*MemoryStorage)(nil)
