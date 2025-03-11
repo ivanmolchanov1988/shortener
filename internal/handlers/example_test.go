@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
@@ -19,7 +20,8 @@ func ExampleHandler_Shorten() {
 		BaseURL: "http://localhost:8080",
 	}
 	storage := memory.NewMemoryStorage()
-	handler := handlers.NewHandler(storage, cfg)
+	shortenerService := core.NewShortener(storage, cfg.BaseURL)
+	handler := handlers.NewHandler(shortenerService, cfg)
 
 	requestData := map[string]string{"url": "https://example.com"}
 	requestBody, _ := json.Marshal(requestData)

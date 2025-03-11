@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
@@ -50,7 +51,7 @@ func (f *FileStorage) SaveURL(id, shortURL, originalURL, userID string) (string,
 	// Cуществует такой originalURL?
 	for _, data := range f.shortLinkData {
 		if data.OriginalURL == originalURL {
-			return data.ShortURL, storage.ErrURLAlreadyExists
+			return data.ShortURL, core.ErrURLAlreadyExists
 		}
 	}
 
@@ -89,7 +90,7 @@ func (f *FileStorage) GetURL(shortURL string) (string, error) {
 	}
 
 	//return "", errors.New("URL not found")
-	return "", storage.ErrURLNotFound
+	return "", core.ErrURLNotFound
 }
 
 // LoadDataFromFile загружает данные из файлового хранилища

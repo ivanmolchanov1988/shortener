@@ -36,6 +36,8 @@ type Config struct {
 	TimeToExpire  int
 	EnableHTTPS   bool   `json:"enable_https"`
 	TrustedSubnet string `json:"trusted_subnet"`
+	//gRPS
+	GRPCAddress string `json:"grpc_address"`
 }
 
 // FlagsConfig - флаги
@@ -50,6 +52,7 @@ type FlagsConfig struct {
 	EnableHTTPS    bool
 	ConfigFilePath string
 	TrustedSubnet  string
+	GRPCAddress    string
 }
 
 var baseDSN = struct {
@@ -97,6 +100,7 @@ func getFlags() (string, FlagsConfig) {
 	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
 	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
 	tempTrustedSubnet := flag.String("t", "", "trusted subnet for stat")
+	tempGRPCAddress := flag.String("g", "", "address to start the gRPC server")
 
 	flag.Parse()
 
@@ -108,6 +112,7 @@ func getFlags() (string, FlagsConfig) {
 		DatabaseDsn:   *tempDB,
 		EnableHTTPS:   *tempEnableHTTPS,
 		TrustedSubnet: *tempTrustedSubnet,
+		GRPCAddress:   *tempGRPCAddress,
 	}
 }
 
@@ -192,6 +197,7 @@ func InitConfig() (*Config, error) {
 	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), fileConfig.DatabaseDsn)
 	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
 	trustedSubnet := firstNonEmpty(flags.TrustedSubnet, os.Getenv("TRUSTED_SUBNET"), fileConfig.TrustedSubnet)
+	gRPCAddress := firstNonEmpty(flags.GRPCAddress, os.Getenv("GRPC_ADDRESS"), fileConfig.GRPCAddress)
 
 	// для Яндекса
 	if address == "" {
@@ -208,8 +214,8 @@ func InitConfig() (*Config, error) {
 	}
 
 	// Логирование для отладки
-	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\nTrustedNet: %s\n",
-		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS, trustedSubnet)
+	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\nTrustedNet: %s\nGRPCAddress: %s\n",
+		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS, trustedSubnet, gRPCAddress)
 	///
 
 	return &Config{
@@ -223,6 +229,7 @@ func InitConfig() (*Config, error) {
 		TimeToExpire:  3,
 		EnableHTTPS:   enableHTTPS,
 		TrustedSubnet: trustedSubnet,
+		GRPCAddress:   gRPCAddress,
 	}, nil
 
 }

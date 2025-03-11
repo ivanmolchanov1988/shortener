@@ -6,13 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 )
 
 func BenchmarkPostURL(b *testing.B) {
 	// Инициализация памяти и обработчика
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore, cfg)
+	shortenerService := core.NewShortener(memStore, cfg.BaseURL)
+	handler := NewHandler(shortenerService, cfg)
 
 	// Сбрасываем таймер, чтобы подготовка не учитывалась
 	b.ResetTimer()

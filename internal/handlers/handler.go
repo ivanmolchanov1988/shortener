@@ -5,36 +5,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 
-	//"github.com/ivanmolchanov1988/shortener/internal/postgres"
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
-	"github.com/ivanmolchanov1988/shortener/internal/storage"
-	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
 // Handler отвечает за обработку HTTP-запросов.
 type Handler struct {
-	storage storage.Storage
-	config  *server.Config
+	//storage storage.Storage
+	shortener core.Shortener
+	config    *server.Config
 }
 
 // NewHandler -  Создание нового Handler.
-func NewHandler(s storage.Storage, cfg *server.Config) *Handler {
+func NewHandler(s core.Shortener, cfg *server.Config) *Handler {
 	if cfg == nil {
 		panic("can't be nil for cfg")
 	}
 	if s == nil {
-		panic("can't be nil for storage")
+		panic("can't be nil for shortener")
 	}
 
 	return &Handler{
-		storage: s,
-		config:  cfg,
+		shortener: s,
+		config:    cfg,
 	}
 }
 
@@ -56,38 +52,21 @@ func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	urlStr := string(body)
-	_, err = url.ParseRequestURI(urlStr)
-	if err != nil {
-		writeErrorResponse(res, http.StatusBadRequest, "Invalid URL")
-		return
-	}
-
-	// Забираем рандомную строку для ссылки.
-	shortURL, err := utils.RandStr(8)
-	if err != nil {
-		writeErrorResponse(res, http.StatusInternalServerError, "Failed to generate short URL")
-		return
-	}
-	// Сохраним URL.
-	id := utils.GenUUID()
-
 	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
 		writeErrorResponse(res, http.StatusInternalServerError, "Error fetching user ID")
 		return
 	}
 
-	existingShortURL, err := h.storage.SaveURL(id, shortURL, urlStr, userID)
+	shortURL, err := h.shortener.PostURL(userID, string(body))
 	if err != nil {
-		if errors.Is(err, storage.ErrURLAlreadyExists) {
-			handleConflictResponse(res, h.config.BaseURL, existingShortURL)
+		if errors.Is(err, core.ErrURLAlreadyExists) {
+			handleConflictResponse(res, h.config.BaseURL, shortURL)
 			return
 		}
 		writeErrorResponse(res, http.StatusInternalServerError, "Error saving URL")
 		return
 	}
-	log.Printf("Successfully saved URL: shortURL=%s, originalURL=%s", shortURL, urlStr)
 
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
@@ -107,43 +86,26 @@ func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Читаем тело запроса и декодируем JSON.
-	requestData, err := decodeRequestBody[[]struct {
-		CorrelationID string `json:"correlation_id"`
-		OriginalURL   string `json:"original_url"`
-	}](req)
-	if err != nil {
+	var requestData []core.BatchRequestItem
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(res, "Error decoding request body", http.StatusBadRequest)
 		return
 	}
 
-	// Открываем транзакцию для записи
-	tx, err := h.storage.BeginTransaction()
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		http.Error(res, "Failed to start transaction", http.StatusInternalServerError)
-		return
-	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Обрабатываем каждый URL
-	responseData, err := h.processBatch(requestData, tx, res, req)
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Завершаем транзакцию
-	if err := tx.Commit(); err != nil {
-		http.Error(res, "Failed to commit transaction", http.StatusInternalServerError)
+	results, err := h.shortener.BatchURL(requestData, userID)
+	if err != nil {
+		http.Error(res, "Error processing batch request", http.StatusInternalServerError)
 		return
 	}
 
 	// Отправляем ответ
-	writeJSONResponse(res, http.StatusCreated, responseData)
+	writeJSONResponse(res, http.StatusCreated, results)
 }
 
 // //////// SHORTEN //////////
@@ -156,42 +118,22 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Декодируем тело запроса
-	requestData, err := decodeRequestBody[struct {
-		URL string `json:"url"`
-	}](req)
-	if err != nil {
+	var requestData core.ShortenRequest
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(res, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 
-	// Валидность URL
-	_, err = url.ParseRequestURI(requestData.URL)
-	if err != nil {
-		http.Error(res, "Invalid URL", http.StatusBadRequest)
-		return
-	}
-
-	// Генерируем shortLink
-	shortURL, err := utils.RandStr(8)
-	if err != nil {
-		http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
-		return
-	}
-
-	// Получаем userID из куки
 	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		http.Error(res, "Error fetching user ID", http.StatusInternalServerError)
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Сохраняем URL
-	existingShortURL, err := h.storage.SaveURL(utils.GenUUID(), shortURL, requestData.URL, userID)
+	response, err := h.shortener.Shorten(requestData, userID)
 	if err != nil {
-		if errors.Is(err, storage.ErrURLAlreadyExists) {
-			// Возвращаем HTTP 409 Conflict и уже существующий shortURL
-			handleConflict(res, fmt.Sprintf("%s/%s", h.config.BaseURL, existingShortURL))
+		if errors.Is(err, core.ErrURLAlreadyExists) {
+			handleConflictResponse(res, h.config.BaseURL, response.ShortURL)
 			return
 		}
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
@@ -202,7 +144,7 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 	writeJSONResponse(res, http.StatusCreated, struct {
 		Result string `json:"result"`
 	}{
-		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
+		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, response),
 	})
 }
 
@@ -210,20 +152,19 @@ func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
 
 // GetURL обрабатывает запрос GET вида http://{server}/{shortURL} и возвращает полный URL.
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
-	idLink := extractIDFromPath(req.URL.Path)
-	if idLink == "" {
+	shortURL := extractIDFromPath(req.URL.Path)
+	if shortURL == "" {
 		writeErrorResponse(res, http.StatusNotFound, "Invalid or empty ID")
 		return
 	}
 
-	// Получаем оригинальный URL
-	originURL, err := h.storage.GetURL(idLink)
+	response, err := h.shortener.GetURL(core.GetURLRequest{ShortURL: shortURL})
 	if err != nil {
-		h.handleStorageError(res, err)
+		writeErrorResponse(res, http.StatusNotFound, "URL not found")
 		return
 	}
 
-	writeRedirectResponse(res, originURL, http.StatusTemporaryRedirect)
+	writeRedirectResponse(res, response.OriginalURL, http.StatusTemporaryRedirect)
 }
 
 // ///////// GET USER URLS //////////
@@ -249,23 +190,19 @@ func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получение URLs пользователя
-	urls, err := h.storage.GetUserURLS(userID)
+	response, err := h.shortener.GetUserURLs(core.GetUserURLsRequest{UserID: userID})
 	if err != nil {
 		writeErrorResponse(w, http.StatusInternalServerError, "Failed to get user URLs")
 		return
 	}
 
 	// Если URLs нет, отправляем HTTP 204
-	if len(urls) == 0 {
+	if len(response.URLs) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	for i := range urls {
-		urls[i].ShortURL = fmt.Sprintf("%s/%s", h.config.BaseURL, urls[i].ShortURL)
-	}
-
-	writeJSONResponse(w, http.StatusOK, urls)
+	writeJSONResponse(w, http.StatusOK, response.URLs)
 }
 
 // ///////// DELETE USER URLS ///////////
@@ -284,38 +221,19 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var shortURLs4Delete []string
-	err = json.NewDecoder(req.Body).Decode(&shortURLs4Delete)
-	if err != nil {
+	var requestData core.DeleteURLsRequest
+	if err := json.NewDecoder(req.Body).Decode(&requestData.ShortURLs); err != nil {
 		writeErrorResponse(res, http.StatusBadRequest, "Error reading request body for delete")
 		return
 	}
 
-	if len(shortURLs4Delete) == 0 {
-		writeErrorResponse(res, http.StatusBadRequest, "There are no URLs to delete")
+	requestData.UserID = userID
+
+	_, err = h.shortener.DeleteURLs(requestData)
+	if err != nil {
+		writeErrorResponse(res, http.StatusInternalServerError, "Failed to delete URLs")
 		return
 	}
-
-	go func() {
-		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
-			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
-		}
-	}()
-	// --- Стоит добавить таймаут для асинхронных операций --- НЕ ПРОХОДИТ ТЕСТЫ iter15 !!!
-	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	// defer cancel()
-
-	// go func(ctx context.Context) {
-	// 	select {
-	// 	case <-ctx.Done():
-	// 		log.Printf("Timeout reached for deleting URLs for user %s", userID)
-	// 		return
-	// 	default:
-	// 		if err := h.storage.DeleteURLS(userID, shortURLs4Delete); err != nil {
-	// 			log.Printf("Failed to delete URLs for user %s: %v", userID, err)
-	// 		}
-	// 	}
-	// }(ctx)
 
 	res.WriteHeader(http.StatusAccepted)
 }
@@ -324,20 +242,6 @@ func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
 
 // GetStats проверяем X-Real-IP и возвращает статистику по urls и users.
 func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
-
-	// Проверяем, установлена ли доверенная подсеть
-	if h.config.TrustedSubnet == "" {
-		http.Error(w, "Access denied: no trusted subnet configured", http.StatusForbidden)
-		return
-	}
-
-	// Парсим доверенную подсеть
-	_, trustedNet, err := net.ParseCIDR(h.config.TrustedSubnet)
-	if err != nil {
-		http.Error(w, "Invalid trusted subnet configuration", http.StatusInternalServerError)
-		return
-	}
-
 	// Получаем IP клиента
 	clientIP, err := resolveClientIP(r)
 	if err != nil {
@@ -345,23 +249,13 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверяем, входит ли клиентский IP в доверенную подсеть
-	if !trustedNet.Contains(clientIP) {
-		http.Error(w, "Access denied: unauthorized subnet", http.StatusForbidden)
-		return
-	}
-
-	// Получаем статистику
-	stats, err := h.storage.GetStats()
+	response, err := h.shortener.GetStats(core.GetStatsRequest{
+		ClientIP: clientIP.String(),
+		Subnet:   h.config.TrustedSubnet,
+	})
 	if err != nil {
-		http.Error(w, "Failed to retrieve statistics", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusForbidden)
 		return
-	}
-
-	// Формируем и отправляем ответ
-	response := statsResponse{
-		URLs:  int(stats.URLs),
-		Users: int(stats.Users),
 	}
 
 	writeJSONResponse(w, http.StatusOK, response)

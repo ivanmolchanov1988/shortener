@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	//"github.com/ivanmolchanov1988/shortener/internal/filestore"
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 )
 
@@ -35,7 +35,7 @@ func (m *MemoryStorage) SaveURL(id, shortURL, originalURL, userID string) (strin
 	for existingShortURL, existingOriginalURL := range m.data {
 		if existingOriginalURL == originalURL {
 			// Возвращаем существующий shortURL и ошибку
-			return existingShortURL, storage.ErrURLAlreadyExists
+			return existingShortURL, core.ErrURLAlreadyExists
 		}
 	}
 
@@ -50,7 +50,7 @@ func (m *MemoryStorage) GetURL(shortURL string) (string, error) {
 
 	originalURL, exists := m.data[shortURL]
 	if !exists {
-		return "", storage.ErrURLNotFound
+		return "", core.ErrURLNotFound
 	}
 	return originalURL, nil
 }

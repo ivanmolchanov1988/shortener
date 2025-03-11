@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package shortener;
+
+option go_package = "github.com/ivanmolchanov1988/shortener/api";
+
+service ShortenerService {
+  rpc PostURL(PostURLRequest) returns (PostURLResponse);
+  rpc Batch(BatchRequest) returns (BatchResponse);
+  rpc Shorten(ShortenRequest) returns (ShortenResponse);
+  rpc GetURL(GetURLRequest) returns (GetURLResponse);
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+  rpc DeleteURLs(DeleteURLsRequest) returns (DeleteURLsResponse);
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+}
+
+////////// POST //////////
+message PostURLRequest {
+  string original_url = 1;
+}
+
+message PostURLResponse {
+  string short_url = 1;
+}
+
+////////// BATCH //////////
+message BatchURL {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message BatchURLResult {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+message BatchRequest {
+  repeated BatchURL urls = 1;
+}
+
+message BatchResponse {
+  repeated BatchURLResult results = 1;
+}
+
+////////// SHORTEN //////////
+message ShortenRequest {
+  string url = 1;
+}
+
+message ShortenResponse {
+  string result = 1;
+}
+
+////////// GET //////////
+message GetURLRequest {
+  string short_url = 1;
+}
+
+message GetURLResponse {
+  string original_url = 1;
+}
+
+////////// GET4USER //////////
+message UserURL {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+message GetUserURLsRequest {
+  string user_id = 1;
+}
+
+message GetUserURLsResponse {
+  repeated UserURL urls = 1;
+}
+
+////////// DELETE //////////
+message DeleteURLsRequest {
+  string user_id = 1;
+  repeated string short_urls = 2;
+}
+
+message DeleteURLsResponse {
+  string status = 1;
+}
+
+////////// GET STAT //////////
+
+message GetStatsRequest {
+  string client_ip = 1;
+}
+
+message GetStatsResponse {
+  int32 urls = 1;
+  int32 users = 2;
+}

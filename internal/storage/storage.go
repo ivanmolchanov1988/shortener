@@ -1,17 +1,6 @@
 // Package storage определяет интерфейсы для взаимодействия с различными хранилищами данных.
 package storage
 
-import (
-	"errors"
-)
-
-// Ошибки.
-var (
-	ErrURLAlreadyExists = errors.New("URL already exists")
-	ErrURLIsGone        = errors.New("url is gone")
-	ErrURLNotFound      = errors.New("URL not found")
-)
-
 // Storage для всех типов хранилищ.
 type Storage interface {
 	SaveURL(id, shortURL, originalURL, userID string) (string, error)
@@ -29,10 +18,16 @@ type TransactionStorage interface {
 	Rollback() error
 }
 
-// UserURLS структура для URLs&
+// UserURLS структура для URLs
 type UserURLS struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+// BatchURLResult представляет ответ на batch-запрос
+type BatchURLResult struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
 }
 
 // Closer описывает интерфейс для закрытия хранилища

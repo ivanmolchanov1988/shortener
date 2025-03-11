@@ -8,6 +8,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
 	"github.com/lib/pq"
 )
@@ -56,7 +57,7 @@ func (t *PostgresTransaction) SaveURLTx(id, shortURL, originalURL, userID string
 	if existingShortURL != shortURL {
 		// URL уже существует, возвращаем существующий shortURL и ошибку
 		//return existingShortURL, ErrURLAlreadyExists
-		return existingShortURL, storage.ErrURLAlreadyExists
+		return existingShortURL, core.ErrURLAlreadyExists
 	}
 
 	log.Printf("Saving URL: id=%s, shortURL=%s, originalURL=%s, userID=%s", id, shortURL, originalURL, userID)
@@ -176,7 +177,7 @@ func (p *PostgresStorage) SaveURL(id, shortURL, originalURL, userID string) (str
 	// Конфликт?
 	if existingShortURL != shortURL {
 		// URL уже существует, возвращаем существующий shortURL и ошибку
-		return existingShortURL, storage.ErrURLAlreadyExists
+		return existingShortURL, core.ErrURLAlreadyExists
 	}
 
 	log.Printf("URL saved successfully: %s", existingShortURL)
@@ -192,12 +193,12 @@ func (p *PostgresStorage) GetURL(shortURL string) (string, error) {
 	err := p.selectStmt.QueryRow(shortURL).Scan(&originalURL, &deleteFlag)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", storage.ErrURLNotFound
+			return "", core.ErrURLNotFound
 		}
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 	if deleteFlag {
-		return "", storage.ErrURLIsGone
+		return "", core.ErrURLIsGone
 	}
 	return originalURL, nil
 }

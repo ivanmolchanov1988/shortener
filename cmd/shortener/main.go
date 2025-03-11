@@ -19,12 +19,16 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ivanmolchanov1988/shortener/api"
 	"github.com/ivanmolchanov1988/shortener/internal/auth"
 	"github.com/ivanmolchanov1988/shortener/internal/compress"
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/handlers"
 	"github.com/ivanmolchanov1988/shortener/internal/storage"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
-	//"github.com/ivanmolchanov1988/shortener/internal/auth"
+	"github.com/ivanmolchanov1988/shortener/internal/grpcserver"
 	"github.com/ivanmolchanov1988/shortener/internal/logger"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 
@@ -114,8 +118,11 @@ func main() {
 		log.Fatalf("Logger initialization failed: %v\n", err)
 	}
 
+	// Создаём core.ShortenerService
+	shortenerService := core.NewShortener(store, cfg.BaseURL)
+
 	// Хендлеры
-	r := setupHandlers(store, cfg)
+	r := setupHandlers(shortenerService, cfg)
 
 	// Создаём HTTP-сервер
 	srv := &http.Server{
@@ -148,15 +155,29 @@ func main() {
 		}
 	}()
 
+	// Запуск gRPC-сервера
+	grpcSrv := grpc.NewServer()
+	reflection.Register(grpcSrv) // Включаем рефлексию!!!
+	shortenerGRPCServer := grpcserver.NewShortenerServer(shortenerService, cfg)
+	api.RegisterShortenerServiceServer(grpcSrv, shortenerGRPCServer)
+
+	grpcListener, err := net.Listen("tcp", cfg.GRPCAddress)
+	if err != nil {
+		log.Fatalf("Failed to start gRPC listener: %v", err)
+	}
+
+	go func() {
+		fmt.Printf("gRPC server started at %s\n", cfg.GRPCAddress)
+		if err := grpcSrv.Serve(grpcListener); err != nil {
+			log.Fatalf("gRPC server error: %v", err)
+		}
+	}()
+
 	// Сервер профилирования в рутине
-	// go func() {
-	// 	log.Println("Starting pprof server on localhost:6060")
-	// 	log.Println(http.ListenAndServe("localhost:6060", nil)) // Сервер профилирования
-	// }()
 	pprofSrv := &http.Server{Addr: "localhost:6060"}
 	go func() {
 		log.Println("Starting pprof server on localhost:6060")
-		if err := pprofSrv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := pprofSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("pprof server error: %v", err)
 		}
 	}()
@@ -180,10 +201,17 @@ func main() {
 		}
 		log.Println("Server shutdown complete.")
 
+		// Завершаем gRPC-сервер
+		log.Println("Shutting down gRPC server...")
+		grpcSrv.GracefulStop()
+		log.Println("gRPC server stopped.")
+
 		// Закрываем pprof
 		log.Println("Shutting down pprof server...")
 		if err := pprofSrv.Shutdown(ctx); err != nil {
 			log.Printf("pprof Shutdown error: %v", err)
+		} else {
+			log.Println("pprof server stopped.")
 		}
 
 		// Закрываем хранилище (если оно поддерживает закрытие)
@@ -204,9 +232,10 @@ func main() {
 
 }
 
-func setupHandlers(store storage.Storage, cfg *server.Config) http.Handler {
+func setupHandlers(shortenerService core.Shortener, cfg *server.Config) http.Handler {
 	//хэндлеры
-	handler := handlers.NewHandler(store, cfg)
+	//handler := handlers.NewHandler(store, cfg)
+	handler := handlers.NewHandler(shortenerService, cfg)
 	r := chi.NewRouter()
 	// Добавляем middleware логирования к каждому запросу
 	r.Use(logger.RequestLogger)

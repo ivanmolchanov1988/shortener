@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/memory"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
 	"github.com/stretchr/testify/require"
@@ -101,7 +102,8 @@ func TestPostURL(t *testing.T) {
 	}
 
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore, cfg)
+	shortenerService := core.NewShortener(memStore, cfg.BaseURL)
+	handler := NewHandler(shortenerService, cfg)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var reader io.Reader = strings.NewReader(tt.body)
@@ -158,7 +160,8 @@ func TestPostURL(t *testing.T) {
 
 func TestShorten(t *testing.T) {
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore, cfg)
+	shortenerService := core.NewShortener(memStore, cfg.BaseURL)
+	handler := NewHandler(shortenerService, cfg)
 
 	urlToSend := `{"url":"https://example.com"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(urlToSend))
@@ -228,7 +231,8 @@ func TestGetURL(t *testing.T) {
 	testUserID := "123333"
 
 	memStore := memory.NewMemoryStorage()
-	handler := NewHandler(memStore, cfg)
+	shortenerService := core.NewShortener(memStore, cfg.BaseURL)
+	handler := NewHandler(shortenerService, cfg)
 
 	if _, err := memStore.SaveURL(id, testShortURL, "https://testURL123.ru", testUserID); err != nil {
 		require.NoError(t, err)
