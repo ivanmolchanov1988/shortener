@@ -1,152 +1,235 @@
+// Package server управляет инициализацией конфигурации и запуском HTTP-сервера.
 package server
 
 import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
+
+	"github.com/ivanmolchanov1988/shortener/internal/memory"
+	postgr "github.com/ivanmolchanov1988/shortener/internal/postgres"
+	"github.com/ivanmolchanov1988/shortener/internal/storage"
+
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/lib/pq"
 )
 
+// Переменные для stdout
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+// Config - конфиг.
 type Config struct {
-	Address         string
-	BaseURL         string
-	Logging         string
-	FileStoragePath string
+	Address         string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	Logging         string `json:"logging"`
+	FileStoragePath string `json:"file_storage_path"`
+	//db
+	DatabaseDsn string `json:"database_dsn"`
+	//user id
+	Secret        string
+	TimeToExpire  int
+	EnableHTTPS   bool   `json:"enable_https"`
+	TrustedSubnet string `json:"trusted_subnet"`
+	//gRPS
+	GRPCAddress string `json:"grpc_address"`
 }
 
+// FlagsConfig - флаги
 type FlagsConfig struct {
 	Address  string
 	BaseURL  string
 	FilePath string
 	Logging  string
+	//db
+	DatabaseDsn string
+	//https
+	EnableHTTPS    bool
+	ConfigFilePath string
+	TrustedSubnet  string
+	GRPCAddress    string
 }
 
-func CreateDirectories(filePath string) error {
-	dir := filepath.Dir(filePath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		fmt.Printf("Directory does not exist, creating: %v\n", dir)
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return fmt.Errorf("error creating directory: %w", err)
-		}
-	}
-	return nil
+var baseDSN = struct {
+	host     string
+	port     string
+	user     string
+	password string
+	dbname   string
+	sslmode  string
+}{
+	host:     "localhost",
+	port:     "5432",
+	user:     "postgres",
+	password: "password",
+	dbname:   "shortener",
+	sslmode:  "disable",
 }
 
-// Проверяем наличие файла и создаем его, если он отсутствует
-func CreateFileIfNotExist(filePath string) error {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Printf("File does not exist, creating: %v\n", filePath)
-		file, err := os.Create(filePath)
-		if err != nil {
-			return fmt.Errorf("error creating file: %w", err)
-		}
-		file.Close()
-	} else if err != nil {
-		return fmt.Errorf("error checking file: %w", err)
-	} else {
-		fmt.Printf("File exists: %v\n", filePath)
-	}
-	return nil
-}
-
+// Usage - начальное логирование.
 func Usage() {
-	var version = "0.0.1"
 
-	fmt.Fprintf(flag.CommandLine.Output(), "Use: %s\n\n\r ", os.Args[0])
-	fmt.Fprintf(flag.CommandLine.Output(), "Version: %s\n\n ", version)
+	// Для примера
+	// go run -ldflags="-X 'github.com/ivanmolchanov1988/shortener/internal/server.buildVersion=1.2.3' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildDate=2025-02-10' -X 'github.com/ivanmolchanov1988/shortener/internal/server.buildCommit=abcdefg'" main.go
+	setDefaultNA(&buildVersion, "N/A")
+	setDefaultNA(&buildDate, "N/A")
+	setDefaultNA(&buildCommit, "N/A")
+	fmt.Fprintf(flag.CommandLine.Output(), "Build version: %s\n\r", buildVersion)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build date: %s\n\r", buildDate)
+	fmt.Fprintf(flag.CommandLine.Output(), "Build commit: %s\n\n\r", buildCommit)
+
 	flag.PrintDefaults()
 }
 
-func getFlags() FlagsConfig {
-	tempAddress := flag.String("a", "localhost:8080", "address to start the HTTP server")
-	tempBaseURL := flag.String("b", "http://localhost:8080", "the URL for the shortURL")
+// Для Яндекса
+func getDefaultFilePath() string {
+	return "/tmp/shortener_config.json"
+}
+
+func getFlags() (string, FlagsConfig) {
+	tempAddress := flag.String("a", "", "address to start the HTTP server")
+	tempBaseURL := flag.String("b", "", "the URL for the shortURL")
 	tempLogging := flag.String("log-level", "info", "logging for INFO lvl")
-	tempFilePath := flag.String("f", getDefaultFilePath(), "file for urls data")
+	tempFilePath := flag.String("f", "", "file for urls data")
+	tempDB := flag.String("d", "", "Postgre DSN (Data Source Name)")
+	tempEnableHTTPS := flag.Bool("s", false, "enable HTTPS (true/false)")
+	tempConfigPath := flag.String("c", "", "path to config file in JSON format")
+	tempTrustedSubnet := flag.String("t", "", "trusted subnet for stat")
+	tempGRPCAddress := flag.String("g", "", "address to start the gRPC server")
 
 	flag.Parse()
 
-	address := os.Getenv("SERVER_ADDRESS")
-	baseURL := os.Getenv("BASE_URL")
-	logging := os.Getenv("LOG_LVL")
-	filePath := os.Getenv("FILE_STORAGE_PATH")
-
-	if address == "" {
-		address = *tempAddress
-	} else {
-		fmt.Printf("Using ENV for address: %s\n", address)
-	}
-	if baseURL == "" {
-		baseURL = *tempBaseURL
-	} else {
-		fmt.Printf("Using ENV for baseURL: %s\n", baseURL)
-	}
-	if filePath == "" {
-		filePath = *tempFilePath
-	} else {
-		fmt.Printf("Using ENV for file path: %s\n", filePath)
-	}
-	if logging == "" {
-		logging = *tempLogging
-	} // добать остальные уровни логирования...
-
-	return FlagsConfig{
-		Address:  address,
-		BaseURL:  baseURL,
-		FilePath: filePath,
-		Logging:  logging,
+	return *tempConfigPath, FlagsConfig{
+		Address:       *tempAddress,
+		BaseURL:       *tempBaseURL,
+		FilePath:      *tempFilePath,
+		Logging:       *tempLogging,
+		DatabaseDsn:   *tempDB,
+		EnableHTTPS:   *tempEnableHTTPS,
+		TrustedSubnet: *tempTrustedSubnet,
+		GRPCAddress:   *tempGRPCAddress,
 	}
 }
 
-func InitConfigAndPrepareStorage() (*Config, error) {
+// InitConfigAndPrepareStorage подготавливает конфигурацию и хранилище.
+func InitConfigAndPrepareStorage() (*Config, storage.Storage, error) {
+	fmt.Println("Initializing configuration and preparing storage...")
 	cfg, err := InitConfig()
 	if err != nil {
-		return nil, err
+		log.Printf("Config is failed: %v\n", err)
+		return nil, nil, fmt.Errorf("config initialization failed: %w", err)
+	}
+	fmt.Printf("Loaded configuration: %+v\n", cfg)
+	if cfg == nil {
+		return nil, nil, errors.New("failed to initialize config")
 	}
 
-	// Создание директорий и файлов
-	if err := CreateDirectories(cfg.FileStoragePath); err != nil {
-		return nil, err
+	var store storage.Storage
+
+	// Определение типа хранилища
+	switch {
+	case cfg.DatabaseDsn != "":
+		db, err := initializeDatabase(cfg.DatabaseDsn)
+		// if cfg.DatabaseDsn == "" {
+		// 	return nil, nil, errors.New("database DSN is empty")
+		// }
+		if err != nil {
+			log.Printf("Database initialization failed, switching to memory storage: %v", err)
+			store = memory.NewMemoryStorage()
+		} else {
+			store, err = postgr.NewPostgresStorage(db)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create NewPostgresStorage: %v", err)
+			}
+			log.Println("Storage initialized with Postgre")
+		}
+	case cfg.FileStoragePath != "":
+		store, err = initializeFileStorage(cfg.FileStoragePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create file storage: %w", err)
+		}
+		log.Println("Storage initialized with file storage")
+	default:
+		store = memory.NewMemoryStorage()
+		log.Println("Using mem storage")
 	}
 
-	if err := CreateFileIfNotExist(cfg.FileStoragePath); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
+	return cfg, store, nil
 }
 
+// InitConfig подготавливает конфиг.
 func InitConfig() (*Config, error) {
 	flag.Usage = Usage
+	configPath, flags := getFlags()
 
-	flags := getFlags()
-
-	if flags.Address == "" || flags.BaseURL == "" {
-		flag.Usage()
-		return nil, errors.New("the address or baseURL is empty")
+	// если flag не указан, пробуем ENV
+	if configPath == "" {
+		configPath = os.Getenv("CONFIG")
 	}
+
+	// теперь пробуем загрузить из файла
+	fileConfig, fileLoaded, err := loadConfig(configPath)
+	if err != nil {
+		log.Printf("Failed to load config from file: %v\n", err)
+	}
+
+	// Если конфиг не загрузился, создаем пустой
+	log.Printf("Trying to load config from: %s", configPath)
+	if fileConfig == nil {
+		log.Println("Config file not loaded, using default empty config.")
+		fileConfig = &Config{}
+	}
+	log.Printf("Loaded TrustedSubnet from JSON: %s", fileConfig.TrustedSubnet)
+	// почему-то не понимает, что конфиг всегда есть
+	var localCfg Config
+
+	// Flags > ENV > JSON
+	address := firstNonEmpty(flags.Address, os.Getenv("SERVER_ADDRESS"), localCfg.Address)
+	baseURL := firstNonEmpty(flags.BaseURL, os.Getenv("BASE_URL"), localCfg.BaseURL)
+	filePath := firstNonEmpty(flags.FilePath, os.Getenv("FILE_STORAGE_PATH"), localCfg.FileStoragePath)
+	logging := firstNonEmpty(flags.Logging, os.Getenv("LOG_LVL"), localCfg.Logging)
+	//dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), localCfg.DatabaseDsn)
+	dbDSN := firstNonEmpty(flags.DatabaseDsn, os.Getenv("DATABASE_DSN"), fileConfig.DatabaseDsn)
+	enableHTTPS := firstNonEmptyBool(flags.EnableHTTPS, parseBool(os.Getenv("ENABLE_HTTPS")), fileConfig.EnableHTTPS)
+	trustedSubnet := firstNonEmpty(flags.TrustedSubnet, os.Getenv("TRUSTED_SUBNET"), fileConfig.TrustedSubnet)
+	gRPCAddress := firstNonEmpty(flags.GRPCAddress, os.Getenv("GRPC_ADDRESS"), fileConfig.GRPCAddress)
+
+	// для Яндекса
+	if address == "" {
+		address = "localhost:8080"
+	}
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+	if filePath == "" {
+		filePath = getDefaultFilePath()
+	}
+	if logging == "" {
+		logging = "info"
+	}
+
+	// Логирование для отладки
+	log.Printf("Config (JSON loaded: %t):\nAddress: %s\nBaseURL: %s\nFilePath: %s\nLogging: %s\nDatabaseDsn: %s\nEnableHTTPS: %t\nTrustedNet: %s\nGRPCAddress: %s\n",
+		fileLoaded, address, baseURL, filePath, logging, dbDSN, enableHTTPS, trustedSubnet, gRPCAddress)
+	///
 
 	return &Config{
-		Address:         flags.Address,
-		BaseURL:         flags.BaseURL,
-		Logging:         flags.Logging,
-		FileStoragePath: flags.FilePath,
+		Address:         address,
+		BaseURL:         baseURL,
+		Logging:         logging,
+		FileStoragePath: filePath,
+		//db
+		DatabaseDsn:   dbDSN,
+		Secret:        "secret",
+		TimeToExpire:  3,
+		EnableHTTPS:   enableHTTPS,
+		TrustedSubnet: trustedSubnet,
+		GRPCAddress:   gRPCAddress,
 	}, nil
 
-}
-
-func getProjectRoot() string {
-	// Используем текущий рабочий каталог как корневой каталог
-	dir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error getting current directory:", err)
-		return ""
-	}
-	return dir
-}
-func getDefaultFilePath() string {
-	projectRoot := getProjectRoot()
-	newPath := filepath.Join(projectRoot, "urls.json")
-	return newPath
 }

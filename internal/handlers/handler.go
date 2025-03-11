@@ -1,172 +1,262 @@
+// Package handlers определяет основной HTTP-хендлер, управляющий запросами к сервису сокращения ссылок.
 package handlers
 
 import (
-	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
+	"github.com/ivanmolchanov1988/shortener/internal/core"
 	"github.com/ivanmolchanov1988/shortener/internal/server"
-	"github.com/ivanmolchanov1988/shortener/pkg/utils"
 )
 
-// interfaces
-type Storage interface {
-	SaveURL(shortURL, originalURL string) error
-	GetURL(shortURL string) (string, error)
-}
-
+// Handler отвечает за обработку HTTP-запросов.
 type Handler struct {
-	storage Storage
-	config  *server.Config
+	//storage storage.Storage
+	shortener core.Shortener
+	config    *server.Config
 }
 
-func NewHandler(s Storage, cfg *server.Config) *Handler {
+// NewHandler -  Создание нового Handler.
+func NewHandler(s core.Shortener, cfg *server.Config) *Handler {
+	if cfg == nil {
+		panic("can't be nil for cfg")
+	}
+	if s == nil {
+		panic("can't be nil for shortener")
+	}
+
 	return &Handler{
-		storage: s,
-		config:  cfg,
+		shortener: s,
+		config:    cfg,
 	}
 }
 
 // //////// POST //////////
+
+// PostURL обрабатывает запрос POST для создания нового сокращенного URL.
+// Принимает URL в теле запроса и возвращает сокращенную версию.
 func (h *Handler) PostURL(res http.ResponseWriter, req *http.Request) {
 	contentType := req.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/x-gzip") {
-		http.Error(res, "Content-Type must be text/plain or application/x-gzip", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Content-Type must be text/plain or application/x-gzip")
 		return
 	}
 
-	// ИНК8 Сжатое тело
-	var body []byte
-	var err error
-
-	if req.Header.Get("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(req.Body)
-		if err != nil {
-			http.Error(res, "Failed to decompress gzip body", http.StatusBadRequest)
-			return
-		}
-		defer gz.Close()
-		body, err = io.ReadAll(gz)
-		if err != nil {
-			http.Error(res, "Unable to read body", http.StatusBadRequest)
-			return
-		}
-	} else {
-		body, err = io.ReadAll(req.Body)
-	}
-
-	// #4.2 Сервер принимает в теле запроса строку URL
+	body, err := readRequestBody(req)
 	if err != nil {
-		http.Error(res, "Unable to read body", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusBadRequest, "Failed to read body")
 		return
 	}
 	defer req.Body.Close()
 
-	urlStr := string(body)
-	_, err = url.ParseRequestURI(urlStr)
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		writeErrorResponse(res, http.StatusInternalServerError, "Error fetching user ID")
 		return
 	}
 
-	// Забираем рандомную строку для ссылки
-	shortURL, err := utils.RandStr(8)
+	shortURL, err := h.shortener.PostURL(userID, string(body))
 	if err != nil {
-		http.Error(res, "Unable to generate short URL", http.StatusBadRequest)
+		if errors.Is(err, core.ErrURLAlreadyExists) {
+			handleConflictResponse(res, h.config.BaseURL, shortURL)
+			return
+		}
+		writeErrorResponse(res, http.StatusInternalServerError, "Error saving URL")
 		return
 	}
-	// Сохраним URL
-	h.storage.SaveURL(shortURL, urlStr)
 
-	// #2 Header Content-Type = text/plain
 	res.Header().Set("Content-Type", "text/plain")
-	// #3 res code = 201
 	res.WriteHeader(http.StatusCreated)
-	// #5 возвращает ответ с сокращённым URL
-	fullShortURL := fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL)
-	res.Write([]byte(fullShortURL))
+	res.Write([]byte(generateShortURL(h.config.BaseURL, shortURL)))
 
 }
 
-// //////// SHORTEN //////////
-func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
-	// Content-Type - application/json
+// ///////// POST BATCH ////////
+
+// Batch обрабатывает запрос POST для создания нового списка сокращенных URLs.
+// Принимает массив объектов из correlation_id и original_url в теле запроса.
+// Возвращает массив объктов из correlation_id и short_url.
+func (h *Handler) Batch(res http.ResponseWriter, req *http.Request) {
+	// Проверка Content-Type
 	if req.Header.Get("Content-Type") != "application/json" {
 		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
 		return
 	}
 
-	// Структура для входящего запроса
-	var requestData struct {
-		URL string `json:"url"`
+	var requestData []core.BatchRequestItem
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
+		http.Error(res, "Error decoding request body", http.StatusBadRequest)
+		return
 	}
 
-	// Декодируем JSON
-	err := json.NewDecoder(req.Body).Decode(&requestData)
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	results, err := h.shortener.BatchURL(requestData, userID)
+	if err != nil {
+		http.Error(res, "Error processing batch request", http.StatusInternalServerError)
+		return
+	}
+
+	// Отправляем ответ
+	writeJSONResponse(res, http.StatusCreated, results)
+}
+
+// //////// SHORTEN //////////
+
+// Shorten обрабатывает запрос POST для создания нового сокращенного URL.
+// Принимает URL как json с параметром url в теле запроса и возвращает сокращенную версию.
+func (h *Handler) Shorten(res http.ResponseWriter, req *http.Request) {
+	if req.Header.Get("Content-Type") != "application/json" {
+		http.Error(res, "Content-Type must be application/json", http.StatusBadRequest)
+		return
+	}
+
+	var requestData core.ShortenRequest
+	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		http.Error(res, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 
-	// Валидность URL
-	_, err = url.ParseRequestURI(requestData.URL)
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, true)
 	if err != nil {
-		http.Error(res, "Invalid URL", http.StatusBadRequest)
+		http.Error(res, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Генерируем shortLink
-	shortURL, err := utils.RandStr(8)
+	response, err := h.shortener.Shorten(requestData, userID)
 	if err != nil {
-		http.Error(res, "Failed to generate short URL", http.StatusInternalServerError)
-		return
-	}
-
-	// Сохраняем URL
-	err = h.storage.SaveURL(shortURL, requestData.URL)
-	if err != nil {
+		if errors.Is(err, core.ErrURLAlreadyExists) {
+			handleConflictResponse(res, h.config.BaseURL, response.ShortURL)
+			return
+		}
 		http.Error(res, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
 
-	// Структуру ответа
-	responseData := struct {
+	// Формируем и отправляем успешный ответ
+	writeJSONResponse(res, http.StatusCreated, struct {
 		Result string `json:"result"`
 	}{
-		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, shortURL),
-	}
-
-	// Заголовок Content-Type для ответа
-	res.Header().Set("Content-Type", "application/json")
-	// 201 Created
-	res.WriteHeader(http.StatusCreated)
-	// responseData в JSON
-	err = json.NewEncoder(res).Encode(responseData)
-	if err != nil {
-		http.Error(res, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+		Result: fmt.Sprintf("%s/%s", h.config.BaseURL, response),
+	})
 }
 
 // ///////// GET //////////
+
+// GetURL обрабатывает запрос GET вида http://{server}/{shortURL} и возвращает полный URL.
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
-	// #7 парсинг ссылки
-	idLink := strings.TrimPrefix(req.URL.Path, "/")
-	if idLink == "" {
-		http.Error(res, "Invalid or empty ID", http.StatusNotFound)
+	shortURL := extractIDFromPath(req.URL.Path)
+	if shortURL == "" {
+		writeErrorResponse(res, http.StatusNotFound, "Invalid or empty ID")
 		return
 	}
-	// #8 возвращение исходной ссылки и 307 в HTTP-заголовке Location
-	// 404, если не найден
-	originURL, err := h.storage.GetURL(idLink)
+
+	response, err := h.shortener.GetURL(core.GetURLRequest{ShortURL: shortURL})
 	if err != nil {
-		http.Error(res, "URL not found", http.StatusNotFound)
+		writeErrorResponse(res, http.StatusNotFound, "URL not found")
 		return
 	}
-	res.Header().Set("Location", originURL)
-	res.WriteHeader(http.StatusTemporaryRedirect)
+
+	writeRedirectResponse(res, response.OriginalURL, http.StatusTemporaryRedirect)
+}
+
+// ///////// GET USER URLS //////////
+
+// GetUserURLS обрабатывает запрос GET вида http://{server}/api/user/urls и возвращает массив с short и original urls.
+func (h *Handler) GetUserURLS(w http.ResponseWriter, r *http.Request) {
+	var userID string
+	userID, err := getUserIDFromCookie(w, r, h.config.Secret, false)
+	if err != nil {
+		// Создаём новую куку для пользователя
+		userID, err = getUserIDFromCookie(w, r, h.config.Secret, true)
+		if err != nil {
+			writeErrorResponse(w, http.StatusInternalServerError, "Failed to create session")
+			return
+		}
+
+		// PASS userID
+		fmt.Printf("New user created: %s\n", userID)
+
+		// Возвращаем 204 No Content, так как это новый пользователь без ссылок
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Получение URLs пользователя
+	response, err := h.shortener.GetUserURLs(core.GetUserURLsRequest{UserID: userID})
+	if err != nil {
+		writeErrorResponse(w, http.StatusInternalServerError, "Failed to get user URLs")
+		return
+	}
+
+	// Если URLs нет, отправляем HTTP 204
+	if len(response.URLs) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	writeJSONResponse(w, http.StatusOK, response.URLs)
+}
+
+// ///////// DELETE USER URLS ///////////
+
+// DeleteURLS обрабатывает запрос DELETE вида http://{server}/api/user/urls.
+// Принимает в теле массив из строк с shortURLs и удаляет их.
+func (h *Handler) DeleteURLS(res http.ResponseWriter, req *http.Request) {
+	if req.Header.Get("Content-Type") != "application/json" {
+		writeErrorResponse(res, http.StatusBadRequest, "Content-Type must be application/json")
+		return
+	}
+
+	userID, err := getUserIDFromCookie(res, req, h.config.Secret, false)
+	if err != nil {
+		writeErrorResponse(res, http.StatusUnauthorized, "Unauthorized for delete")
+		return
+	}
+
+	var requestData core.DeleteURLsRequest
+	if err := json.NewDecoder(req.Body).Decode(&requestData.ShortURLs); err != nil {
+		writeErrorResponse(res, http.StatusBadRequest, "Error reading request body for delete")
+		return
+	}
+
+	requestData.UserID = userID
+
+	_, err = h.shortener.DeleteURLs(requestData)
+	if err != nil {
+		writeErrorResponse(res, http.StatusInternalServerError, "Failed to delete URLs")
+		return
+	}
+
+	res.WriteHeader(http.StatusAccepted)
+}
+
+// ///////// GET STATS ///////////
+
+// GetStats проверяем X-Real-IP и возвращает статистику по urls и users.
+func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+	// Получаем IP клиента
+	clientIP, err := resolveClientIP(r)
+	if err != nil {
+		http.Error(w, "Failed to resolve client IP", http.StatusInternalServerError)
+		return
+	}
+
+	response, err := h.shortener.GetStats(core.GetStatsRequest{
+		ClientIP: clientIP.String(),
+		Subnet:   h.config.TrustedSubnet,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
+	writeJSONResponse(w, http.StatusOK, response)
 }
